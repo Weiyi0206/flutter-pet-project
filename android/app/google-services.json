@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "148217355085",
+    "project_id": "fir-authpet",
+    "storage_bucket": "fir-authpet.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:148217355085:android:40f118ba63cc5e42d33504",
+        "android_client_info": {
+          "package_name": "com.example.petapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBS7Ijf8UW67xquipgLXgOGZ8_gC01fsOM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

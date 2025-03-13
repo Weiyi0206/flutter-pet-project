@@ -1,10 +1,16 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'dart:math';
 import 'package:chat_bubbles/chat_bubbles.dart';
 import 'services/gemini_service.dart';
 import 'package:logging/logging.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   // Initialize logging
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
@@ -26,12 +32,46 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Virtual Pet Companion',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Virtual Pet Companion'),
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            return const MyHomePage(title: 'Virtual Pet Companion');
+          }
+          return const AuthWrapper();
+        },
+      ),
     );
+  }
+}
+
+class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool showLogin = true;
+
+  void toggleView() {
+    setState(() {
+      showLogin = !showLogin;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (showLogin) {
+      return LoginScreen(onRegisterPress: toggleView);
+    } else {
+      return RegisterScreen(onLoginPress: toggleView);
+    }
   }
 }
 
