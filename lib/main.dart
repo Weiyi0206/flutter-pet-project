@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/chat_history_screen.dart';
 import 'dart:math';
-import 'package:chat_bubbles/chat_bubbles.dart';
 import 'services/gemini_service.dart';
 import 'package:logging/logging.dart';
 
@@ -99,6 +99,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _chatController = TextEditingController();
   final GeminiService _geminiService = GeminiService();
   final List<ChatMessage> _messages = [];
+  String? _currentResponse;
 
   @override
   void initState() {
@@ -172,7 +173,17 @@ class _MyHomePageState extends State<MyHomePage> {
         text: response,
         isUser: false,
         timestamp: timeString,
-      ));
+       ));
+      _currentResponse = response;
+    });
+
+    // Clear response after 5 seconds
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _currentResponse = null;
+        });
+      }
     });
   }
 
@@ -184,6 +195,17 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
         actions: [
           IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatHistoryScreen(messages: _messages),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
@@ -193,102 +215,72 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: Column(
         children: [
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                // Virtual Pet Display
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade100,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        width: 200,
-                        height: 200,
-                        child: CustomPaint(
-                          painter: PetPainter(
-                            color: _petStatus == 'Happy' ? Colors.green :
-                                   _petStatus == 'Normal' ? Colors.blue :
-                                   Colors.red,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        'Happiness: $_happiness%',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      Text(
-                        'Status: $_petStatus',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _petThePet,
-                            icon: const Icon(Icons.pets),
-                            label: const Text('Pet'),
-                          ),
-                          const SizedBox(width: 20),
-                          ElevatedButton.icon(
-                            onPressed: _feedThePet,
-                            icon: const Icon(Icons.restaurant),
-                            label: const Text('Feed'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
           Expanded(
-            child: ListView.builder(
-              reverse: true,
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[_messages.length - 1 - index];
-                return Column(
-                  crossAxisAlignment: message.isUser 
-                      ? CrossAxisAlignment.end 
-                      : CrossAxisAlignment.start,
-                  children: [
-                    BubbleSpecialOne(
-                      text: message.text,
-                      isSender: message.isUser,
-                      color: message.isUser ? Colors.blue[100]! : Colors.green[100]!,
-                      textStyle: TextStyle(
-                        color: Colors.black87,
-                        fontSize: 16,
-                      ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  // Virtual Pet Display
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade100,
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    Padding(
-                      padding: EdgeInsets.only(
-                        left: message.isUser ? 0 : 20,
-                        right: message.isUser ? 20 : 0,
-                        bottom: 8,
-                      ),
-                      child: Text(
-                        message.timestamp,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12,
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          width: 200,
+                          height: 200,
+                          child: CustomPaint(
+                            painter: PetPainter(
+                              color: _petStatus == 'Happy' ? Colors.green :
+                                     _petStatus == 'Normal' ? Colors.blue :
+                                     Colors.red,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (_currentResponse != null)
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text(
+                              _currentResponse!,
+                              style: Theme.of(context).textTheme.bodyLarge,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        Text(
+                          'Happiness: $_happiness%',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                        Text(
+                          'Status: $_petStatus',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: _petThePet,
+                              icon: const Icon(Icons.pets),
+                              label: const Text('Pet'),
+                            ),
+                            const SizedBox(width: 20),
+                            ElevatedButton.icon(
+                              onPressed: _feedThePet,
+                              icon: const Icon(Icons.restaurant),
+                              label: const Text('Feed'),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                );
-              },
+                  ),
+                ],
+              ),
             ),
           ),
-          
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
@@ -296,14 +288,14 @@ class _MyHomePageState extends State<MyHomePage> {
                 Expanded(
                   child: TextField(
                     controller: _chatController,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'Talk to your pet...',
                       border: OutlineInputBorder(),
                     ),
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.send),
+                  icon: const Icon(Icons.send),
                   onPressed: _sendMessage,
                 ),
               ],
