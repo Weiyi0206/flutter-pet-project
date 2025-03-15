@@ -29,6 +29,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _passwordController.text,
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );
