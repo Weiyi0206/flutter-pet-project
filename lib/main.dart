@@ -5,15 +5,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/chat_history_screen.dart';
+import 'screens/help_support_screen.dart';
 import 'dart:math';
 import 'services/gemini_service.dart';
 import 'package:logging/logging.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Initialize logging
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
@@ -45,7 +44,7 @@ class MyApp extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          
+
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
@@ -53,7 +52,7 @@ class MyApp extends StatelessWidget {
           if (snapshot.hasData) {
             return const MyHomePage(title: 'Virtual Pet Companion');
           }
-          
+
           return const AuthWrapper();
         },
       ),
@@ -116,7 +115,9 @@ class _MyHomePageState extends State<MyHomePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Unable to connect to AI service. Please check your internet connection and API key.'),
+            content: Text(
+              'Unable to connect to AI service. Please check your internet connection and API key.',
+            ),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 5),
           ),
@@ -154,14 +155,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
     final userMessage = _chatController.text;
     final now = DateTime.now();
-    final timeString = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    
+    final timeString =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
     setState(() {
-      _messages.add(ChatMessage(
-        text: userMessage,
-        isUser: true,
-        timestamp: timeString,
-      ));
+      _messages.add(
+        ChatMessage(text: userMessage, isUser: true, timestamp: timeString),
+      );
       _chatController.clear();
     });
 
@@ -172,11 +172,9 @@ class _MyHomePageState extends State<MyHomePage> {
     );
 
     setState(() {
-      _messages.add(ChatMessage(
-        text: response,
-        isUser: false,
-        timestamp: timeString,
-       ));
+      _messages.add(
+        ChatMessage(text: response, isUser: false, timestamp: timeString),
+      );
       _currentResponse = response;
     });
 
@@ -223,62 +221,107 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  // Virtual Pet Display
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          width: 200,
-                          height: 200,
-                          child: CustomPaint(
-                            painter: PetPainter(
-                              color: _petStatus == 'Happy' ? Colors.green :
-                                     _petStatus == 'Normal' ? Colors.blue :
-                                     Colors.red,
-                            ),
-                          ),
+                  // Virtual Pet Display and Help Button
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade100,
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        if (_currentResponse != null)
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              _currentResponse!,
-                              style: Theme.of(context).textTheme.bodyLarge,
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        Text(
-                          'Happiness: $_happiness%',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        Text(
-                          'Status: $_petStatus',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        child: Column(
                           children: [
-                            ElevatedButton.icon(
-                              onPressed: _petThePet,
-                              icon: const Icon(Icons.pets),
-                              label: const Text('Pet'),
+                            SizedBox(
+                              width: 200,
+                              height: 200,
+                              child: CustomPaint(
+                                painter: PetPainter(
+                                  color:
+                                      _petStatus == 'Happy'
+                                          ? Colors.green
+                                          : _petStatus == 'Normal'
+                                          ? Colors.blue
+                                          : Colors.red,
+                                ),
+                              ),
                             ),
-                            const SizedBox(width: 20),
-                            ElevatedButton.icon(
-                              onPressed: _feedThePet,
-                              icon: const Icon(Icons.restaurant),
-                              label: const Text('Feed'),
+                            if (_currentResponse != null)
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                  _currentResponse!,
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            Text(
+                              'Happiness: $_happiness%',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                            Text(
+                              'Status: $_petStatus',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: _petThePet,
+                                  icon: const Icon(Icons.pets),
+                                  label: const Text('Pet'),
+                                ),
+                                const SizedBox(width: 20),
+                                ElevatedButton.icon(
+                                  onPressed: _feedThePet,
+                                  icon: const Icon(Icons.restaurant),
+                                  label: const Text('Feed'),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(
+                        width: 16,
+                      ), // Spacing between pet and help button
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              iconSize: 32,
+                              icon: const Icon(Icons.support_agent),
+                              color: Colors.red,
+                              tooltip: 'Get Help & Support',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => const HelpSupportScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Help',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -312,25 +355,26 @@ class _MyHomePageState extends State<MyHomePage> {
 
 class PetPainter extends CustomPainter {
   final Color color;
-  
+
   PetPainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
+    final paint =
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.fill;
 
     final pixelSize = size.width / 8;
     final pixels = [
-      [0,0,1,1,1,1,0,0],
-      [0,1,1,1,1,1,1,0],
-      [1,1,0,1,1,0,1,1],
-      [1,1,1,1,1,1,1,1],
-      [1,1,1,1,1,1,1,1],
-      [0,1,1,1,1,1,1,0],
-      [0,0,1,0,0,1,0,0],
-      [0,0,1,1,1,1,0,0],
+      [0, 0, 1, 1, 1, 1, 0, 0],
+      [0, 1, 1, 1, 1, 1, 1, 0],
+      [1, 1, 0, 1, 1, 0, 1, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1],
+      [0, 1, 1, 1, 1, 1, 1, 0],
+      [0, 0, 1, 0, 0, 1, 0, 0],
+      [0, 0, 1, 1, 1, 1, 0, 0],
     ];
 
     for (var y = 0; y < pixels.length; y++) {
@@ -338,7 +382,7 @@ class PetPainter extends CustomPainter {
         if (pixels[y][x] == 1) {
           canvas.drawRect(
             Rect.fromLTWH(x * pixelSize, y * pixelSize, pixelSize, pixelSize),
-            paint
+            paint,
           );
         }
       }
@@ -355,8 +399,8 @@ class ChatMessage {
   final String timestamp;
 
   ChatMessage({
-    required this.text, 
-    required this.isUser, 
-    required this.timestamp
+    required this.text,
+    required this.isUser,
+    required this.timestamp,
   });
 }
