@@ -107,18 +107,95 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Timer? _tipTimer;
   final Random _random = Random();
-  final List<String> _dailyTips = [
-    "Hey, shall we try a quick breathing exercise together? Just breathe in for 4, hold for 4, out for 4! 🧘‍♂️",
-    "Don't forget to drink some water today! Staying hydrated helps your mind stay clear. 💧",
-    "How about a 2-minute stretch break? Your body will thank you! 🤸‍♂️",
-    "Remember to take a moment to appreciate something good today. What made you smile? 😊",
-    "Maybe we could practice mindfulness together? Just focus on this moment for a minute. 🌟",
-    "Time for a quick screen break! Look at something 20 feet away for 20 seconds. 👀",
-    "Let's do a quick gratitude check - what are you thankful for today? 🙏",
-    "How about a short walk? Even a few minutes of movement can boost your mood! 🚶‍♂️",
+  final List<Map<String, String>> _dailyTips = [
+    // Breathing exercises
+    {
+      'text': '''Take a moment to try this breathing exercise:
+• Breathe in for 4 seconds
+• Hold for 4 seconds
+• Breathe out for 4 seconds
+Let's do it together! 🧘‍♂️''',
+      'category': 'breathing',
+    },
+
+    // Self-care reminders
+    {
+      'text': '''Time for a quick self-care check! 💧
+• Have you had water recently?
+• Stretched your muscles?
+• Taken a short break?
+Your well-being matters!''',
+      'category': 'self-care',
+    },
+
+    // Exercise suggestions
+    {
+      'text': '''Let's energize with a mini exercise break! 🤸‍♂️
+Choose one:
+• 10 gentle stretches
+• 30 seconds of marching in place
+• A quick walk around your space
+Your body will thank you!''',
+      'category': 'exercise',
+    },
+
+    // Mindfulness practices
+    {
+      'text': '''Mindfulness Moment 😊
+Take 30 seconds to:
+• Notice 3 things you can see
+• Feel 2 things you can touch
+• Listen to 1 sound around you
+How do you feel?''',
+      'category': 'mindfulness',
+    },
+
+    // More mindfulness
+    {
+      'text': '''Let's practice presence together! 🌟
+Close your eyes and:
+• Take 3 deep breaths
+• Notice how your body feels
+• Let your thoughts float by
+Just one minute of peace.''',
+      'category': 'mindfulness',
+    },
+
+    // Screen break reminder
+    {
+      'text': '''Eye Care Break! 👀
+Follow the 20-20-20 rule:
+• Look away from your screen
+• Focus on something 20 feet away
+• Do this for 20 seconds
+Your eyes deserve rest!''',
+      'category': 'self-care',
+    },
+
+    // Gratitude practice
+    {
+      'text': '''Gratitude Check-in Time! 🙏
+Can you think of:
+• One person who made you smile
+• One thing that went well
+• One small joy in your day
+Grateful hearts are happy hearts!''',
+      'category': 'mindfulness',
+    },
+
+    // Movement reminder
+    {
+      'text': '''Movement Break! 🚶‍♂️
+Choose your mini-adventure:
+• Short walk around your space
+• Quick stretch session
+• Simple desk exercises
+Every movement counts!''',
+      'category': 'exercise',
+    },
   ];
 
-  List<String> _unusedTips = [];
+  List<Map<String, String>> _unusedTips = [];
 
   @override
   void initState() {
@@ -131,6 +208,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void dispose() {
     _tipTimer?.cancel();
+    _chatController.dispose();
     super.dispose();
   }
 
@@ -177,14 +255,14 @@ class _MyHomePageState extends State<MyHomePage> {
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
     setState(() {
-      _currentResponse = tip;
+      _currentResponse = tip['text'];
       _messages.add(
-        ChatMessage(text: tip, isUser: false, timestamp: timeString),
+        ChatMessage(text: tip['text']!, isUser: false, timestamp: timeString),
       );
     });
 
     Future.delayed(const Duration(seconds: 15), () {
-      if (mounted && _currentResponse == tip) {
+      if (mounted && _currentResponse == tip['text']) {
         setState(() {
           _currentResponse = null;
         });
@@ -286,7 +364,6 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  // Virtual Pet Display and Help Button
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -349,9 +426,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           ],
                         ),
                       ),
-                      const SizedBox(
-                        width: 16,
-                      ), // Spacing between pet and help button
+                      const SizedBox(width: 16),
                       Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -382,6 +457,35 @@ class _MyHomePageState extends State<MyHomePage> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.red,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              iconSize: 32,
+                              icon: const Icon(Icons.tips_and_updates),
+                              color: Colors.green,
+                              tooltip: 'Daily Practice Tips',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => DailyTipsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Tips',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
                             ),
                           ),
                         ],

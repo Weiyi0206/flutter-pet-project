@@ -8,19 +8,22 @@ class TipsService {
 
   Future<List<PracticeTip>> getTipsByCategory(String category) async {
     try {
-      final DocumentSnapshot doc = await _firestore
-          .collection('tips')
-          .where('category', isEqualTo: category)
-          .get()
-          .then((snapshot) => snapshot.docs.first);
+      final QuerySnapshot snapshot =
+          await _firestore
+              .collection('tips')
+              .where('category', isEqualTo: category)
+              .get();
 
+      if (snapshot.docs.isEmpty) {
+        return [];
+      }
+
+      final doc = snapshot.docs.first;
       final List<dynamic> tipsData = doc['tips'] as List<dynamic>;
+
       return tipsData
           .map(
-            (tipData) => PracticeTip(
-              title: tipData['title'],
-              description: tipData['description'],
-            ),
+            (tipData) => PracticeTip.fromMap(tipData as Map<String, dynamic>),
           )
           .toList();
     } catch (e) {
