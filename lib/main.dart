@@ -1,9 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/chat_history_screen.dart';
+import 'screens/help_support_screen.dart';
 import 'dart:math';
 import 'services/gemini_service.dart';
 import 'package:logging/logging.dart';
@@ -12,7 +14,7 @@ import 'dart:async';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Initialize logging
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
@@ -284,85 +286,107 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const DailyTipsScreen(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.tips_and_updates),
-                      label: const Text('Daily Practice Tips'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
+                  // Virtual Pet Display and Help Button
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade100,
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          width: 200,
-                          height: 200,
-                          child: CustomPaint(
-                            painter: PetPainter(
-                              color:
-                                  _petStatus == 'Happy'
-                                      ? Colors.green
-                                      : _petStatus == 'Normal'
-                                      ? Colors.blue
-                                      : Colors.red,
-                            ),
-                          ),
-                        ),
-                        if (_currentResponse != null)
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              _currentResponse!,
-                              style: Theme.of(context).textTheme.bodyLarge,
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        Text(
-                          'Happiness: $_happiness%',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        Text(
-                          'Status: $_petStatus',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        child: Column(
                           children: [
-                            ElevatedButton.icon(
-                              onPressed: _petThePet,
-                              icon: const Icon(Icons.pets),
-                              label: const Text('Pet'),
+                            SizedBox(
+                              width: 200,
+                              height: 200,
+                              child: CustomPaint(
+                                painter: PetPainter(
+                                  color:
+                                      _petStatus == 'Happy'
+                                          ? Colors.green
+                                          : _petStatus == 'Normal'
+                                          ? Colors.blue
+                                          : Colors.red,
+                                ),
+                              ),
                             ),
-                            const SizedBox(width: 20),
-                            ElevatedButton.icon(
-                              onPressed: _feedThePet,
-                              icon: const Icon(Icons.restaurant),
-                              label: const Text('Feed'),
+                            if (_currentResponse != null)
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                  _currentResponse!,
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            Text(
+                              'Happiness: $_happiness%',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                            Text(
+                              'Status: $_petStatus',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: _petThePet,
+                                  icon: const Icon(Icons.pets),
+                                  label: const Text('Pet'),
+                                ),
+                                const SizedBox(width: 20),
+                                ElevatedButton.icon(
+                                  onPressed: _feedThePet,
+                                  icon: const Icon(Icons.restaurant),
+                                  label: const Text('Feed'),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(
+                        width: 16,
+                      ), // Spacing between pet and help button
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              iconSize: 32,
+                              icon: const Icon(Icons.support_agent),
+                              color: Colors.red,
+                              tooltip: 'Get Help & Support',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => const HelpSupportScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Help',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ],
               ),
