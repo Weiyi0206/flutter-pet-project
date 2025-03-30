@@ -108,89 +108,67 @@ class _MyHomePageState extends State<MyHomePage> {
   Timer? _tipTimer;
   final Random _random = Random();
   final List<Map<String, String>> _dailyTips = [
-    // Breathing exercises
     {
-      'text': '''Take a moment to try this breathing exercise:
-• Breathe in for 4 seconds
-• Hold for 4 seconds
-• Breathe out for 4 seconds
-Let's do it together! 🧘‍♂️''',
+      'text': '''Quick Breath! 🧘‍♂️
+• In (4s)
+• Hold (4s)
+• Out (4s)
+Let's do it!''',
       'category': 'breathing',
     },
-
-    // Self-care reminders
     {
-      'text': '''Time for a quick self-care check! 💧
-• Have you had water recently?
-• Stretched your muscles?
-• Taken a short break?
-Your well-being matters!''',
+      'text': '''Self-Care Check 💧
+• Water?
+• Stretch?
+• Break?
+Take care!''',
       'category': 'self-care',
     },
-
-    // Exercise suggestions
     {
-      'text': '''Let's energize with a mini exercise break! 🤸‍♂️
-Choose one:
-• 10 gentle stretches
-• 30 seconds of marching in place
-• A quick walk around your space
-Your body will thank you!''',
+      'text': '''Quick Move! 🤸‍♂️
+Choose:
+• 10 stretches
+• 30s march
+• Short walk''',
       'category': 'exercise',
     },
-
-    // Mindfulness practices
     {
-      'text': '''Mindfulness Moment 😊
-Take 30 seconds to:
-• Notice 3 things you can see
-• Feel 2 things you can touch
-• Listen to 1 sound around you
-How do you feel?''',
+      'text': '''Mindful Moment 😊
+Notice:
+• 3 sights
+• 2 touches
+• 1 sound''',
       'category': 'mindfulness',
     },
-
-    // More mindfulness
     {
-      'text': '''Let's practice presence together! 🌟
-Close your eyes and:
-• Take 3 deep breaths
-• Notice how your body feels
-• Let your thoughts float by
-Just one minute of peace.''',
+      'text': '''Present Time 🌟
+• Deep breath
+• Feel body
+• Let thoughts go''',
       'category': 'mindfulness',
     },
-
-    // Screen break reminder
     {
-      'text': '''Eye Care Break! 👀
-Follow the 20-20-20 rule:
-• Look away from your screen
-• Focus on something 20 feet away
-• Do this for 20 seconds
-Your eyes deserve rest!''',
+      'text': '''Eye Break! 👀
+20-20-20:
+• Look away
+• 20 feet far
+• 20 seconds''',
       'category': 'self-care',
     },
-
-    // Gratitude practice
     {
-      'text': '''Gratitude Check-in Time! 🙏
-Can you think of:
-• One person who made you smile
-• One thing that went well
-• One small joy in your day
-Grateful hearts are happy hearts!''',
+      'text': '''Gratitude 🙏
+Think of:
+• A friend
+• A win
+• A joy''',
       'category': 'mindfulness',
     },
-
-    // Movement reminder
     {
-      'text': '''Movement Break! 🚶‍♂️
-Choose your mini-adventure:
-• Short walk around your space
-• Quick stretch session
-• Simple desk exercises
-Every movement counts!''',
+      'text': '''Move Time! 🚶‍♂️
+Pick one:
+• Quick walk
+• Stretches
+• Desk moves''',
       'category': 'exercise',
     },
   ];
@@ -261,7 +239,7 @@ Every movement counts!''',
       );
     });
 
-    Future.delayed(const Duration(seconds: 15), () {
+    Future.delayed(const Duration(seconds: 20), () {
       if (mounted && _currentResponse == tip['text']) {
         setState(() {
           _currentResponse = null;
@@ -369,11 +347,17 @@ Every movement counts!''',
                     children: [
                       Container(
                         padding: const EdgeInsets.all(20),
+                        constraints: const BoxConstraints(
+                          maxWidth: 250,
+                        ), // Limit container width
                         decoration: BoxDecoration(
                           color: Colors.blue.shade100,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Column(
+                          mainAxisSize:
+                              MainAxisSize
+                                  .min, // Add this to prevent vertical overflow
                           children: [
                             SizedBox(
                               width: 200,
@@ -390,12 +374,19 @@ Every movement counts!''',
                               ),
                             ),
                             if (_currentResponse != null)
-                              Padding(
+                              Container(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 180,
+                                ), // Limit width
                                 padding: const EdgeInsets.all(8.0),
                                 child: Text(
                                   _currentResponse!,
-                                  style: Theme.of(context).textTheme.bodyLarge,
+                                  style: Theme.of(context).textTheme.bodyMedium,
                                   textAlign: TextAlign.center,
+                                  softWrap: true, // Enable text wrapping
+                                  overflow:
+                                      TextOverflow
+                                          .visible, // Allow text to wrap to next line
                                 ),
                               ),
                             Text(
