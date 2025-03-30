@@ -7,6 +7,8 @@ import 'screens/chat_history_screen.dart';
 import 'dart:math';
 import 'services/gemini_service.dart';
 import 'package:logging/logging.dart';
+import 'screens/daily_tips_screen.dart';
+import 'dart:async';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,7 +44,7 @@ class MyApp extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          
+
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
@@ -50,7 +52,7 @@ class MyApp extends StatelessWidget {
           if (snapshot.hasData) {
             return const MyHomePage(title: 'Virtual Pet Companion');
           }
-          
+
           return const AuthWrapper();
         },
       ),
@@ -101,10 +103,33 @@ class _MyHomePageState extends State<MyHomePage> {
   final List<ChatMessage> _messages = [];
   String? _currentResponse;
 
+  Timer? _tipTimer;
+  final Random _random = Random();
+  final List<String> _dailyTips = [
+    "Hey, shall we try a quick breathing exercise together? Just breathe in for 4, hold for 4, out for 4! 🧘‍♂️",
+    "Don't forget to drink some water today! Staying hydrated helps your mind stay clear. 💧",
+    "How about a 2-minute stretch break? Your body will thank you! 🤸‍♂️",
+    "Remember to take a moment to appreciate something good today. What made you smile? 😊",
+    "Maybe we could practice mindfulness together? Just focus on this moment for a minute. 🌟",
+    "Time for a quick screen break! Look at something 20 feet away for 20 seconds. 👀",
+    "Let's do a quick gratitude check - what are you thankful for today? 🙏",
+    "How about a short walk? Even a few minutes of movement can boost your mood! 🚶‍♂️",
+  ];
+
+  List<String> _unusedTips = [];
+
   @override
   void initState() {
     super.initState();
     _checkApiConnection();
+    _unusedTips = List.from(_dailyTips);
+    _startTipTimer();
+  }
+
+  @override
+  void dispose() {
+    _tipTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _checkApiConnection() async {
@@ -113,13 +138,56 @@ class _MyHomePageState extends State<MyHomePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Unable to connect to AI service. Please check your internet connection and API key.'),
+            content: Text(
+              'Unable to connect to AI service. Please check your internet connection and API key.',
+            ),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 5),
           ),
         );
       }
     }
+  }
+
+  void _startTipTimer() {
+    Future.delayed(const Duration(seconds: 10), () {
+      _showRandomTip();
+    });
+
+    _tipTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      _showRandomTip();
+    });
+  }
+
+  void _showRandomTip() {
+    if (!mounted) return;
+
+    if (_unusedTips.isEmpty) {
+      _unusedTips = List.from(_dailyTips);
+    }
+
+    final randomIndex = _random.nextInt(_unusedTips.length);
+    final tip = _unusedTips[randomIndex];
+    _unusedTips.removeAt(randomIndex);
+
+    final now = DateTime.now();
+    final timeString =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    setState(() {
+      _currentResponse = tip;
+      _messages.add(
+        ChatMessage(text: tip, isUser: false, timestamp: timeString),
+      );
+    });
+
+    Future.delayed(const Duration(seconds: 15), () {
+      if (mounted && _currentResponse == tip) {
+        setState(() {
+          _currentResponse = null;
+        });
+      }
+    });
   }
 
   void _petThePet() {
@@ -151,14 +219,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
     final userMessage = _chatController.text;
     final now = DateTime.now();
-    final timeString = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    
+    final timeString =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
     setState(() {
-      _messages.add(ChatMessage(
-        text: userMessage,
-        isUser: true,
-        timestamp: timeString,
-      ));
+      _messages.add(
+        ChatMessage(text: userMessage, isUser: true, timestamp: timeString),
+      );
       _chatController.clear();
     });
 
@@ -169,15 +236,12 @@ class _MyHomePageState extends State<MyHomePage> {
     );
 
     setState(() {
-      _messages.add(ChatMessage(
-        text: response,
-        isUser: false,
-        timestamp: timeString,
-       ));
+      _messages.add(
+        ChatMessage(text: response, isUser: false, timestamp: timeString),
+      );
       _currentResponse = response;
     });
 
-    // Clear response after 5 seconds
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted) {
         setState(() {
@@ -220,7 +284,27 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  // Virtual Pet Display
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const DailyTipsScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.tips_and_updates),
+                      label: const Text('Daily Practice Tips'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ),
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -234,9 +318,12 @@ class _MyHomePageState extends State<MyHomePage> {
                           height: 200,
                           child: CustomPaint(
                             painter: PetPainter(
-                              color: _petStatus == 'Happy' ? Colors.green :
-                                     _petStatus == 'Normal' ? Colors.blue :
-                                     Colors.red,
+                              color:
+                                  _petStatus == 'Happy'
+                                      ? Colors.green
+                                      : _petStatus == 'Normal'
+                                      ? Colors.blue
+                                      : Colors.red,
                             ),
                           ),
                         ),
@@ -309,25 +396,26 @@ class _MyHomePageState extends State<MyHomePage> {
 
 class PetPainter extends CustomPainter {
   final Color color;
-  
+
   PetPainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
+    final paint =
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.fill;
 
     final pixelSize = size.width / 8;
     final pixels = [
-      [0,0,1,1,1,1,0,0],
-      [0,1,1,1,1,1,1,0],
-      [1,1,0,1,1,0,1,1],
-      [1,1,1,1,1,1,1,1],
-      [1,1,1,1,1,1,1,1],
-      [0,1,1,1,1,1,1,0],
-      [0,0,1,0,0,1,0,0],
-      [0,0,1,1,1,1,0,0],
+      [0, 0, 1, 1, 1, 1, 0, 0],
+      [0, 1, 1, 1, 1, 1, 1, 0],
+      [1, 1, 0, 1, 1, 0, 1, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 1, 1, 1, 1, 1, 1, 1],
+      [0, 1, 1, 1, 1, 1, 1, 0],
+      [0, 0, 1, 0, 0, 1, 0, 0],
+      [0, 0, 1, 1, 1, 1, 0, 0],
     ];
 
     for (var y = 0; y < pixels.length; y++) {
@@ -335,7 +423,7 @@ class PetPainter extends CustomPainter {
         if (pixels[y][x] == 1) {
           canvas.drawRect(
             Rect.fromLTWH(x * pixelSize, y * pixelSize, pixelSize, pixelSize),
-            paint
+            paint,
           );
         }
       }
@@ -352,8 +440,8 @@ class ChatMessage {
   final String timestamp;
 
   ChatMessage({
-    required this.text, 
-    required this.isUser, 
-    required this.timestamp
+    required this.text,
+    required this.isUser,
+    required this.timestamp,
   });
 }
