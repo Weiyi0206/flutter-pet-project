@@ -10,6 +10,8 @@ import 'screens/attendance_screen.dart';
 import 'dart:math';
 import 'services/gemini_service.dart';
 import 'package:logging/logging.dart';
+import 'screens/daily_tips_screen.dart';
+import 'dart:async';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -104,10 +106,89 @@ class _MyHomePageState extends State<MyHomePage> {
   final List<ChatMessage> _messages = [];
   String? _currentResponse;
 
+  Timer? _tipTimer;
+  final Random _random = Random();
+  final List<Map<String, String>> _dailyTips = [
+    {
+      'text': '''Quick Breath! 🧘‍♂️
+• In (4s)
+• Hold (4s)
+• Out (4s)
+Let's do it!''',
+      'category': 'breathing',
+    },
+    {
+      'text': '''Self-Care Check 💧
+• Water?
+• Stretch?
+• Break?
+Take care!''',
+      'category': 'self-care',
+    },
+    {
+      'text': '''Quick Move! 🤸‍♂️
+Choose:
+• 10 stretches
+• 30s march
+• Short walk''',
+      'category': 'exercise',
+    },
+    {
+      'text': '''Mindful Moment 😊
+Notice:
+• 3 sights
+• 2 touches
+• 1 sound''',
+      'category': 'mindfulness',
+    },
+    {
+      'text': '''Present Time 🌟
+• Deep breath
+• Feel body
+• Let thoughts go''',
+      'category': 'mindfulness',
+    },
+    {
+      'text': '''Eye Break! 👀
+20-20-20:
+• Look away
+• 20 feet far
+• 20 seconds''',
+      'category': 'self-care',
+    },
+    {
+      'text': '''Gratitude 🙏
+Think of:
+• A friend
+• A win
+• A joy''',
+      'category': 'mindfulness',
+    },
+    {
+      'text': '''Move Time! 🚶‍♂️
+Pick one:
+• Quick walk
+• Stretches
+• Desk moves''',
+      'category': 'exercise',
+    },
+  ];
+
+  List<Map<String, String>> _unusedTips = [];
+
   @override
   void initState() {
     super.initState();
     _checkApiConnection();
+    _unusedTips = List.from(_dailyTips);
+    _startTipTimer();
+  }
+
+  @override
+  void dispose() {
+    _tipTimer?.cancel();
+    _chatController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkApiConnection() async {
@@ -125,6 +206,47 @@ class _MyHomePageState extends State<MyHomePage> {
         );
       }
     }
+  }
+
+  void _startTipTimer() {
+    Future.delayed(const Duration(seconds: 10), () {
+      _showRandomTip();
+    });
+
+    _tipTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      _showRandomTip();
+    });
+  }
+
+  void _showRandomTip() {
+    if (!mounted) return;
+
+    if (_unusedTips.isEmpty) {
+      _unusedTips = List.from(_dailyTips);
+    }
+
+    final randomIndex = _random.nextInt(_unusedTips.length);
+    final tip = _unusedTips[randomIndex];
+    _unusedTips.removeAt(randomIndex);
+
+    final now = DateTime.now();
+    final timeString =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    setState(() {
+      _currentResponse = tip['text'];
+      _messages.add(
+        ChatMessage(text: tip['text']!, isUser: false, timestamp: timeString),
+      );
+    });
+
+    Future.delayed(const Duration(seconds: 20), () {
+      if (mounted && _currentResponse == tip['text']) {
+        setState(() {
+          _currentResponse = null;
+        });
+      }
+    });
   }
 
   void _petThePet() {
@@ -179,7 +301,6 @@ class _MyHomePageState extends State<MyHomePage> {
       _currentResponse = response;
     });
 
-    // Clear response after 5 seconds
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted) {
         setState(() {
@@ -222,17 +343,22 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  // Virtual Pet Display and Help Button
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
                         padding: const EdgeInsets.all(20),
+                        constraints: const BoxConstraints(
+                          maxWidth: 250,
+                        ), // Limit container width
                         decoration: BoxDecoration(
                           color: Colors.blue.shade100,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Column(
+                          mainAxisSize:
+                              MainAxisSize
+                                  .min, // Add this to prevent vertical overflow
                           children: [
                             SizedBox(
                               width: 200,
@@ -249,12 +375,19 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                             ),
                             if (_currentResponse != null)
-                              Padding(
+                              Container(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 180,
+                                ), // Limit width
                                 padding: const EdgeInsets.all(8.0),
                                 child: Text(
                                   _currentResponse!,
-                                  style: Theme.of(context).textTheme.bodyLarge,
+                                  style: Theme.of(context).textTheme.bodyMedium,
                                   textAlign: TextAlign.center,
+                                  softWrap: true, // Enable text wrapping
+                                  overflow:
+                                      TextOverflow
+                                          .visible, // Allow text to wrap to next line
                                 ),
                               ),
                             Text(
@@ -285,9 +418,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           ],
                         ),
                       ),
-                      const SizedBox(
-                        width: 16,
-                      ), // Spacing between pet and help button
+                      const SizedBox(width: 16),
                       Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -350,6 +481,35 @@ class _MyHomePageState extends State<MyHomePage> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.red,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              iconSize: 32,
+                              icon: const Icon(Icons.tips_and_updates),
+                              color: Colors.green,
+                              tooltip: 'Daily Practice Tips',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => DailyTipsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Tips',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
                             ),
                           ),
                         ],
