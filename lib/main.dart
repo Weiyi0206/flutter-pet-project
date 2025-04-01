@@ -11,6 +11,7 @@ import 'services/gemini_service.dart';
 import 'package:logging/logging.dart';
 import 'screens/daily_tips_screen.dart';
 import 'dart:async';
+import 'screens/test_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -477,6 +478,35 @@ Pick one:
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.green,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              iconSize: 32,
+                              icon: const Icon(Icons.psychology),
+                              color: Colors.orange,
+                              tooltip: 'Take a Test',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const TestScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Test',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
                             ),
                           ),
                         ],
