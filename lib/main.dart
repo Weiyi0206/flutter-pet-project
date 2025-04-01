@@ -6,6 +6,7 @@ import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/chat_history_screen.dart';
 import 'screens/help_support_screen.dart';
+import 'screens/attendance_screen.dart';
 import 'dart:math';
 import 'services/gemini_service.dart';
 import 'package:logging/logging.dart';
@@ -422,6 +423,38 @@ Pick one:
                       Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
+                          // Daily Check-in button
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              iconSize: 32,
+                              icon: const Icon(Icons.calendar_month),
+                              color: Colors.amber.shade700,
+                              tooltip: 'Daily Check-in',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => const AttendanceScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const Text(
+                            'Check-in',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          // Help and Support button
                           Container(
                             decoration: BoxDecoration(
                               color: Colors.red.shade100,
