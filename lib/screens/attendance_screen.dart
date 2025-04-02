@@ -3,7 +3,7 @@ import 'package:helloworld/services/attendance_service.dart';
 import 'package:helloworld/widgets/attendance_calendar.dart';
 
 class AttendanceScreen extends StatefulWidget {
-  const AttendanceScreen({Key? key}) : super(key: key);
+  const AttendanceScreen({super.key});
 
   @override
   State<AttendanceScreen> createState() => _AttendanceScreenState();
