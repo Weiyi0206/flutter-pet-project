@@ -84,65 +84,31 @@ class _AnimatedPetState extends State<AnimatedPet> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    final buttonSize = widget.size * 0.2;
-    
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GestureDetector(
-          onTap: () {
-            widget.onPet();
-            _triggerPetAnimation();
-          },
-          child: Container(
-            width: widget.size,
-            height: widget.size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: _getStatusColor().withOpacity(0.3),
-                  blurRadius: widget.size * 0.075,
-                  spreadRadius: widget.size * 0.025,
-                ),
-              ],
-            ),
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                return _buildPet();
-              },
-            ),
-          ),
-        ),
-        SizedBox(height: widget.size * 0.1),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildActionButton(
-              onPressed: () {
-                widget.onPet();
-                _triggerPetAnimation();
-              },
-              icon: Icons.pets,
-              label: 'Pet',
-              color: Colors.purple,
-              size: buttonSize,
-            ),
-            SizedBox(width: widget.size * 0.1),
-            _buildActionButton(
-              onPressed: () {
-                widget.onFeed();
-                _triggerFeedAnimation();
-              },
-              icon: Icons.restaurant,
-              label: 'Feed',
-              color: Colors.orange,
-              size: buttonSize,
+    return GestureDetector(
+      onTap: () {
+        widget.onPet();
+        _triggerPetAnimation();
+      },
+      child: Container(
+        width: widget.size,
+        height: widget.size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: _getStatusColor().withOpacity(0.3),
+              blurRadius: widget.size * 0.075,
+              spreadRadius: widget.size * 0.025,
             ),
           ],
         ),
-      ],
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return _buildPet();
+          },
+        ),
+      ),
     );
   }
 
@@ -268,45 +234,6 @@ class _AnimatedPetState extends State<AnimatedPet> with SingleTickerProviderStat
       begin: isLeft ? -2 : 2,
       end: isLeft ? 2 : -2,
       curve: Curves.easeInOut,
-    );
-  }
-
-  Widget _buildActionButton({
-    required VoidCallback onPressed,
-    required IconData icon,
-    required String label,
-    required Color color,
-    required double size,
-  }) {
-    return Material(
-      elevation: 4,
-      borderRadius: BorderRadius.circular(size * 0.2),
-      color: color,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(size * 0.2),
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: size * 0.3,
-            vertical: size * 0.2,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: Colors.white, size: size * 0.4),
-              SizedBox(width: size * 0.15),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: size * 0.3,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
