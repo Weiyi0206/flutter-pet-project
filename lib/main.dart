@@ -12,6 +12,12 @@ import 'services/gemini_service.dart';
 import 'package:logging/logging.dart';
 import 'screens/daily_tips_screen.dart';
 import 'dart:async';
+import 'widgets/animated_pet.dart';
+import 'widgets/animated_chat_bubble.dart';
+import 'widgets/happiness_meter.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:animated_text_kit/animated_text_kit.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -105,6 +111,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final GeminiService _geminiService = GeminiService();
   final List<ChatMessage> _messages = [];
   String? _currentResponse;
+  String? _lastUserMessage;
 
   Timer? _tipTimer;
   final Random _random = Random();
@@ -175,6 +182,7 @@ Pick one:
   ];
 
   List<Map<String, String>> _unusedTips = [];
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -281,42 +289,114 @@ Pick one:
     final timeString =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
+    // Store the message in history
     setState(() {
       _messages.add(
         ChatMessage(text: userMessage, isUser: true, timestamp: timeString),
       );
+      _lastUserMessage = userMessage;
       _chatController.clear();
+      
+      // Clear any previous response while waiting for new one
+      _currentResponse = null;
     });
 
-    final response = await _geminiService.getChatResponse(
-      userMessage,
-      _happiness,
-      _petStatus,
-    );
-
-    setState(() {
-      _messages.add(
-        ChatMessage(text: response, isUser: false, timestamp: timeString),
-      );
-      _currentResponse = response;
-    });
-
-    Future.delayed(const Duration(seconds: 5), () {
+    // Keep user message visible for 15 seconds
+    Future.delayed(const Duration(seconds: 15), () {
       if (mounted) {
         setState(() {
-          _currentResponse = null;
+          _lastUserMessage = null;
         });
       }
     });
+
+    try {
+      final response = await _geminiService.getChatResponse(
+        userMessage,
+        _happiness,
+        _petStatus,
+      );
+
+      // Store the response in history and show it
+      if (mounted) {
+        setState(() {
+          _messages.add(
+            ChatMessage(text: response, isUser: false, timestamp: timeString),
+          );
+          _currentResponse = response;
+        });
+
+        // Remove pet response after 15 seconds
+        Future.delayed(const Duration(seconds: 15), () {
+          if (mounted && _currentResponse == response) {
+            setState(() {
+              _currentResponse = null;
+            });
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          final errorMessage = "Sorry, I couldn't process that. Let's try again!";
+          _messages.add(
+            ChatMessage(
+              text: errorMessage,
+              isUser: false,
+              timestamp: timeString,
+            ),
+          );
+          _currentResponse = errorMessage;
+        });
+      }
+      print("Error in chat response: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 360;
+    
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
+        title: Text(
+          widget.title,
+          style: GoogleFonts.fredoka(
+            fontSize: screenSize.width * 0.055, // Responsive font size
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        elevation: 8,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(20),
+          ),
+        ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AttendanceScreen(),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.lightbulb_outline),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DailyTipsScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () {
@@ -336,214 +416,559 @@ Pick one:
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        constraints: const BoxConstraints(
-                          maxWidth: 250,
-                        ), // Limit container width
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade100,
-                          borderRadius: BorderRadius.circular(20),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.purple.shade50,
+              Colors.blue.shade50,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Main content with pet and features
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Pet container - centered
+                        Positioned(
+                          top: constraints.maxHeight * 0.1,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: AnimatedPet(
+                              status: _petStatus,
+                              onPet: _petThePet,
+                              onFeed: _feedThePet,
+                              size: constraints.maxWidth * 0.6, // Responsive size
+                            ),
+                          ),
                         ),
-                        child: Column(
-                          mainAxisSize:
-                              MainAxisSize
-                                  .min, // Add this to prevent vertical overflow
-                          children: [
-                            SizedBox(
-                              width: 200,
-                              height: 200,
-                              child: CustomPaint(
-                                painter: PetPainter(
-                                  color:
-                                      _petStatus == 'Happy'
-                                          ? Colors.green
-                                          : _petStatus == 'Normal'
-                                          ? Colors.blue
-                                          : Colors.red,
-                                ),
+                        
+                        // Feature buttons - positioned on left side
+                        Positioned(
+                          top: constraints.maxHeight * 0.15,
+                          left: isSmallScreen ? 5 : 15,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildFeatureButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => AttendanceScreen(),
+                                    ),
+                                  );
+                                },
+                                icon: Icons.calendar_today,
+                                label: 'Check-in',
+                                color: Colors.amber,
+                                size: isSmallScreen ? 40 : 50,
                               ),
-                            ),
-                            if (_currentResponse != null)
-                              Container(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 180,
-                                ), // Limit width
-                                padding: const EdgeInsets.all(8.0),
-                                child: Text(
-                                  _currentResponse!,
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                  textAlign: TextAlign.center,
-                                  softWrap: true, // Enable text wrapping
-                                  overflow:
-                                      TextOverflow
-                                          .visible, // Allow text to wrap to next line
-                                ),
+                              SizedBox(height: constraints.maxHeight * 0.03),
+                              _buildFeatureButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const HelpSupportScreen(),
+                                    ),
+                                  );
+                                },
+                                icon: Icons.support_agent,
+                                label: 'Help',
+                                color: Colors.red,
+                                size: isSmallScreen ? 40 : 50,
                               ),
-                            Text(
-                              'Happiness: $_happiness%',
-                              style: Theme.of(context).textTheme.headlineSmall,
-                            ),
-                            Text(
-                              'Status: $_petStatus',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 20),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                              SizedBox(height: constraints.maxHeight * 0.03),
+                              _buildFeatureButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => DailyTipsScreen(),
+                                    ),
+                                  );
+                                },
+                                icon: Icons.tips_and_updates,
+                                label: 'Tips',
+                                color: Colors.green,
+                                size: isSmallScreen ? 40 : 50,
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        // Pet speech bubble (only shown when there's a response)
+                        if (_currentResponse != null)
+                          Positioned(
+                            top: constraints.maxHeight * 0.05,
+                            right: constraints.maxWidth * 0.1,
+                            left: constraints.maxWidth * 0.3,
+                            child: Stack(
+                              clipBehavior: Clip.none,
                               children: [
-                                ElevatedButton.icon(
-                                  onPressed: _petThePet,
-                                  icon: const Icon(Icons.pets),
-                                  label: const Text('Pet'),
+                                // Main bubble
+                                Container(
+                                  constraints: BoxConstraints(
+                                    maxWidth: constraints.maxWidth * 0.6,
+                                    maxHeight: constraints.maxHeight * 0.2,
+                                  ),
+                                  padding: EdgeInsets.all(constraints.maxWidth * 0.03),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.95),
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 5,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Flexible(
+                                        child: SingleChildScrollView(
+                                          child: AnimatedTextKit(
+                                            animatedTexts: [
+                                              TypewriterAnimatedText(
+                                                _currentResponse!,
+                                                speed: const Duration(milliseconds: 50),
+                                                textStyle: TextStyle(
+                                                  fontSize: constraints.maxWidth * 0.035,
+                                                  color: _getStatusTextColor(),
+                                                ),
+                                              ),
+                                            ],
+                                            totalRepeatCount: 1,
+                                            displayFullTextOnTap: true,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(width: 20),
-                                ElevatedButton.icon(
-                                  onPressed: _feedThePet,
-                                  icon: const Icon(Icons.restaurant),
-                                  label: const Text('Feed'),
+                                
+                                // Triangle pointer
+                                Positioned(
+                                  bottom: -10,
+                                  left: constraints.maxWidth * 0.15,
+                                  child: CustomPaint(
+                                    size: Size(20, 10),
+                                    painter: BubbleTrianglePainter(),
+                                  ),
+                                ),
+                              ],
+                            ).animate().fadeIn().slideY(
+                                  begin: -0.5,
+                                  end: 0,
+                                  duration: 300.ms,
+                                ),
+                          ),
+                        
+                        // Pet stats and activities section
+                        Positioned(
+                          bottom: constraints.maxHeight * 0.22, // Position it above status bar
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            margin: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05),
+                            child: Column(
+                              children: [
+                                // Pet mood and activities
+                                Container(
+                                  padding: EdgeInsets.all(constraints.maxWidth * 0.03),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.7),
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: _getStatusTextColor().withOpacity(0.1),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      // Today's activities
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                        children: [
+                                          _buildActivityStat(
+                                            icon: Icons.pets,
+                                            label: 'Pets today',
+                                            value: '${_random.nextInt(10) + 5}',
+                                            color: Colors.purple,
+                                            constraints: constraints,
+                                          ),
+                                          _buildActivityStat(
+                                            icon: Icons.restaurant,
+                                            label: 'Meals',
+                                            value: '${_random.nextInt(3) + 1}/3',
+                                            color: Colors.orange,
+                                            constraints: constraints,
+                                          ),
+                                          _buildActivityStat(
+                                            icon: Icons.favorite,
+                                            label: 'Mood',
+                                            value: _petStatus,
+                                            color: _getStatusTextColor(),
+                                            constraints: constraints,
+                                          ),
+                                        ],
+                                      ),
+                                      
+                                      SizedBox(height: constraints.maxHeight * 0.015),
+                                      
+                                      // Daily streak
+                                      Container(
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: constraints.maxHeight * 0.01,
+                                          horizontal: constraints.maxWidth * 0.03,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber.shade100,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.local_fire_department,
+                                              color: Colors.orange,
+                                              size: constraints.maxWidth * 0.05,
+                                            ),
+                                            SizedBox(width: constraints.maxWidth * 0.02),
+                                            Text(
+                                              'Daily streak: ${_random.nextInt(30) + 1} days',
+                                              style: GoogleFonts.fredoka(
+                                                fontSize: constraints.maxWidth * 0.035,
+                                                color: Colors.orange.shade800,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
-                          ],
+                          ),
+                        ),
+                        
+                        // Status indicator
+                        Positioned(
+                          bottom: constraints.maxHeight * 0.05,
+                          left: 0,
+                          right: 0,
+                          child: Column(
+                            children: [
+                              Text(
+                                'Status: $_petStatus',
+                                style: GoogleFonts.fredoka(
+                                  fontSize: constraints.maxWidth * 0.04,
+                                  color: _getStatusTextColor(),
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Center(
+                                child: Container(
+                                  width: constraints.maxWidth * 0.6,
+                                  height: 15,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      FractionallySizedBox(
+                                        widthFactor: _happiness / 100,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: _getStatusTextColor(),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                '$_happiness%',
+                                style: GoogleFonts.fredoka(
+                                  fontSize: constraints.maxWidth * 0.035,
+                                  color: _getStatusTextColor(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // User's last message (only shown when there's a message)
+                        if (_lastUserMessage != null)
+                          Positioned(
+                            bottom: constraints.maxHeight * 0.15, // Position it above the status
+                            right: 0,
+                            child: Container(
+                              constraints: BoxConstraints(
+                                maxWidth: constraints.maxWidth * 0.7,
+                                maxHeight: constraints.maxHeight * 0.1,
+                              ),
+                              margin: EdgeInsets.only(right: constraints.maxWidth * 0.05),
+                              padding: EdgeInsets.all(constraints.maxWidth * 0.025),
+                              decoration: BoxDecoration(
+                                color: Colors.purple.shade100.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 5,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.person,
+                                    size: constraints.maxWidth * 0.04,
+                                    color: Colors.purple.shade700,
+                                  ),
+                                  SizedBox(width: constraints.maxWidth * 0.02),
+                                  Flexible(
+                                    child: Text(
+                                      _lastUserMessage!,
+                                      style: TextStyle(
+                                        fontSize: constraints.maxWidth * 0.035,
+                                        color: Colors.purple.shade800,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ).animate().fadeIn(duration: 300.ms).slideX(
+                              begin: 0.5,
+                              end: 0,
+                              duration: 300.ms,
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              
+              // Chat input
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: screenSize.width * 0.03,
+                  vertical: screenSize.height * 0.015,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _chatController,
+                        decoration: InputDecoration(
+                          hintText: 'Talk to your pet...',
+                          hintStyle: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: screenSize.width * 0.04,
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: screenSize.width * 0.05,
+                            vertical: screenSize.height * 0.015,
+                          ),
+                        ),
+                        style: TextStyle(fontSize: screenSize.width * 0.04),
+                        onSubmitted: (_) => _sendMessage(),
+                      ),
+                    ),
+                    SizedBox(width: screenSize.width * 0.02),
+                    Material(
+                      color: Colors.purple,
+                      borderRadius: BorderRadius.circular(30),
+                      child: InkWell(
+                        onTap: _sendMessage,
+                        borderRadius: BorderRadius.circular(30),
+                        child: Container(
+                          padding: EdgeInsets.all(screenSize.width * 0.035),
+                          child: Icon(
+                            Icons.send,
+                            color: Colors.white,
+                            size: screenSize.width * 0.05,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Daily Check-in button
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.shade100,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: IconButton(
-                              iconSize: 32,
-                              icon: const Icon(Icons.calendar_month),
-                              color: Colors.amber.shade700,
-                              tooltip: 'Daily Check-in',
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => const AttendanceScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const Text(
-                            'Check-in',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.amber,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          // Help and Support button
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade100,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: IconButton(
-                              iconSize: 32,
-                              icon: const Icon(Icons.support_agent),
-                              color: Colors.red,
-                              tooltip: 'Get Help & Support',
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => const HelpSupportScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Help',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade100,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: IconButton(
-                              iconSize: 32,
-                              icon: const Icon(Icons.tips_and_updates),
-                              color: Colors.green,
-                              tooltip: 'Daily Practice Tips',
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => DailyTipsScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Tips',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _chatController,
-                    decoration: const InputDecoration(
-                      hintText: 'Talk to your pet...',
-                      border: OutlineInputBorder(),
                     ),
-                  ),
+                  ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+
+  Widget _buildFeatureButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required double size,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onPressed,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: EdgeInsets.all(size * 0.25),
+                child: Icon(
+                  icon,
+                  size: size * 0.5,
+                  color: color,
+                ),
+              ),
+            ),
+          ),
+        ).animate().scale(
+              duration: 200.ms,
+              curve: Curves.easeOut,
+              delay: 100.ms,
+            ),
+        SizedBox(height: 8),
+        Text(
+          label,
+          style: GoogleFonts.fredoka(
+            color: color,
+            fontSize: size * 0.28,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getStatusTextColor() {
+    switch (_petStatus) {
+      case 'Happy':
+        return Colors.green.shade700;
+      case 'Sad':
+        return Colors.red.shade700;
+      default:
+        return Colors.blue.shade700;
+    }
+  }
+
+  Widget _buildActivityStat({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    required BoxConstraints constraints,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          color: color,
+          size: constraints.maxWidth * 0.06,
+        ),
+        SizedBox(height: constraints.maxHeight * 0.005),
+        Text(
+          value,
+          style: GoogleFonts.fredoka(
+            fontSize: constraints.maxWidth * 0.04,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        SizedBox(height: constraints.maxHeight * 0.002),
+        Text(
+          label,
+          style: GoogleFonts.fredoka(
+            fontSize: constraints.maxWidth * 0.03,
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class BubbleTrianglePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.95)
+      ..style = PaintingStyle.fill;
+
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class PetPainter extends CustomPainter {
