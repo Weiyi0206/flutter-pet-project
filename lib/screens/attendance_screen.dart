@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:helloworld/services/attendance_service.dart';
 import 'package:helloworld/widgets/attendance_calendar.dart';
+import '../main.dart';
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
@@ -64,9 +65,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       });
     }
   }
+  final moodOptions = [
+      {'emoji': '😊', 'label': 'Happy', 'color': Colors.yellow},
+      {'emoji': '😌', 'label': 'Calm', 'color': Colors.blue.shade300},
+      {'emoji': '😐', 'label': 'Neutral', 'color': Colors.grey.shade400},
+      {'emoji': '😔', 'label': 'Sad', 'color': Colors.indigo.shade300},
+      {'emoji': '😡', 'label': 'Angry', 'color': Colors.red.shade400},
+      {'emoji': '😰', 'label': 'Anxious', 'color': Colors.purple.shade300},
+    ];
 
   Future<void> _handleCheckIn() async {
-    final result = await _attendanceService.markAttendance();
+    final mood = moodOptions.first['label'] as String;
+    final result = await _attendanceService.markAttendanceWithMood(mood);
 
     if (result.success) {
       setState(() {

@@ -21,12 +21,14 @@ class AttendanceResult {
   final String message;
   final int streak;
   final AttendanceReward? reward;
+  final String? mood;
 
   AttendanceResult({
     required this.success,
     required this.message,
     required this.streak,
     this.reward,
+    this.mood,
   });
 }
 
@@ -41,6 +43,15 @@ class AttendanceService {
 
   // Get the current user ID or return null if not logged in
   String? get _userId => _auth.currentUser?.uid;
+
+  // new added
+  Future<bool> shouldShowCheckInPrompt() async {
+    if (_userId == null) return false;
+
+    // Check if user hasn't checked in today
+    final hasChecked = await hasCheckedInToday();
+    return !hasChecked;
+  }
 
   // Check if the user has already checked in today
   Future<bool> hasCheckedInToday() async {
@@ -76,7 +87,7 @@ class AttendanceService {
   }
 
   // Mark attendance for today
-  Future<AttendanceResult> markAttendance() async {
+  Future<AttendanceResult> markAttendanceWithMood(String mood) async {
     if (_userId == null) {
       return AttendanceResult(
         success: false,
@@ -160,6 +171,7 @@ class AttendanceService {
           .set({
             'date': today,
             'streak': currentStreak,
+            'mood': mood,
             'reward': {
               'name': reward.name,
               'happinessBoost': reward.happinessBoost,
@@ -179,6 +191,7 @@ class AttendanceService {
               : 'Check-in successful!',
       streak: currentStreak,
       reward: reward,
+      mood: mood,
     );
   }
 }
