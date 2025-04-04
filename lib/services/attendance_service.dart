@@ -175,7 +175,7 @@ class AttendanceService {
       success: true,
       message:
           currentStreak > 1
-              ? 'Check-in successful! ${currentStreak} day streak!'
+              ? 'Check-in successful! $currentStreak day streak!'
               : 'Check-in successful!',
       streak: currentStreak,
       reward: reward,

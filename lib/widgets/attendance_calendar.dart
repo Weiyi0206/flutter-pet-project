@@ -7,11 +7,11 @@ class AttendanceCalendar extends StatefulWidget {
   final DateTime? selectedDate;
 
   const AttendanceCalendar({
-    Key? key,
+    super.key,
     required this.markedDates,
     this.onDaySelected,
     this.selectedDate,
-  }) : super(key: key);
+  });
 
   @override
   State<AttendanceCalendar> createState() => _AttendanceCalendarState();
