@@ -188,7 +188,7 @@ Pick one:
   bool _hasCheckedInToday = false;
   DateTime? _lastCheckInDate;
   String? _currentMood;
-  List<String> _moodOptions = [
+  final List<String> _moodOptions = [
     '😊 Happy',
     '😐 Neutral',
     '😔 Sad',
@@ -219,14 +219,14 @@ Pick one:
 
   bool _isVisualizationActive = false;
 
-  Map<String, bool> _dailyRoutineItems = {
+  final Map<String, bool> _dailyRoutineItems = {
     "Morning check-in": false,
     "Hydration reminder": false,
     "Movement break": false,
     "Evening reflection": false,
   };
 
-  List<String> _affirmations = [
+  final List<String> _affirmations = [
     "You are enough just as you are.",
     "You're doing better than you think.",
     "Small steps forward are still progress.",
@@ -2433,7 +2433,7 @@ Pick one:
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
-                                            'You earned: ${result.reward!.name}',
+                                            'You earned: ${result.reward!.name}'
                                           ),
                                           Text(
                                             'Happiness boost: +${result.reward!.happinessBoost}',
@@ -2459,12 +2459,13 @@ Pick one:
                                 );
                               }
                             }
-                            onTap:
-                            () {
-                              // Record the selected mood
-                              _recordMood(mood['label'] as String);
-                              Navigator.pop(context);
-                            };
+                          },
+                            // onTap:
+                            // () {
+                            //   // Record the selected mood
+                            //   _recordMood(mood['label'] as String);
+                            //   Navigator.pop(context);
+                            // };
                             child:
                             Column(
                               mainAxisSize: MainAxisSize.min,
@@ -2488,8 +2489,7 @@ Pick one:
                                   style: GoogleFonts.fredoka(fontSize: 12),
                                 ),
                               ],
-                            );
-                          },
+                            ),
                         );
                       }).toList(),
                 ),
