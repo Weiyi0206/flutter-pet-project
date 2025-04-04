@@ -8,26 +8,34 @@ class TipsService {
 
   Future<List<PracticeTip>> getTipsByCategory(String category) async {
     try {
+      print('Fetching tips for category: ${category.toLowerCase()}');
+
+      // Query for exact category match
       final QuerySnapshot snapshot =
           await _firestore
               .collection('tips')
-              .where('category', isEqualTo: category)
+              .where('category', isEqualTo: category.toLowerCase())
               .get();
 
+      print('Found ${snapshot.docs.length} tips for $category');
+
       if (snapshot.docs.isEmpty) {
+        print('No tips found for category: $category');
         return [];
       }
 
-      final doc = snapshot.docs.first;
-      final List<dynamic> tipsData = doc['tips'] as List<dynamic>;
+      final tips =
+          snapshot.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            print(
+              'Processing tip: ${data['title']} with category ${data['category']}',
+            );
+            return PracticeTip.fromMap(data);
+          }).toList();
 
-      return tipsData
-          .map(
-            (tipData) => PracticeTip.fromMap(tipData as Map<String, dynamic>),
-          )
-          .toList();
+      return tips;
     } catch (e) {
-      _logger.severe('Error fetching tips for category $category:', e);
+      print('Error fetching tips: $e');
       return [];
     }
   }

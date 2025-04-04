@@ -2390,6 +2390,7 @@ Pick one:
               mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 10),
+                // Emoji mood selector
                 Wrap(
                   alignment: WrapAlignment.center,
                   spacing: 15,
@@ -2458,30 +2459,37 @@ Pick one:
                                 );
                               }
                             }
-                          },
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: (mood['color'] as Color).withOpacity(
-                                    0.2,
+                            onTap:
+                            () {
+                              // Record the selected mood
+                              _recordMood(mood['label'] as String);
+                              Navigator.pop(context);
+                            };
+                            child:
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: (mood['color'] as Color).withOpacity(
+                                      0.2,
+                                    ),
+                                    shape: BoxShape.circle,
                                   ),
-                                  shape: BoxShape.circle,
+                                  child: Text(
+                                    mood['emoji'] as String,
+                                    style: const TextStyle(fontSize: 30),
+                                  ),
                                 ),
-                                child: Text(
-                                  mood['emoji'] as String,
-                                  style: const TextStyle(fontSize: 30),
+                                const SizedBox(height: 5),
+                                Text(
+                                  mood['label'] as String,
+                                  style: GoogleFonts.fredoka(fontSize: 12),
                                 ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                mood['label'] as String,
-                                style: GoogleFonts.fredoka(fontSize: 12),
-                              ),
-                            ],
-                          ),
+                              ],
+                            );
+                          },
                         );
                       }).toList(),
                 ),
@@ -2523,10 +2531,17 @@ Pick one:
         color: Colors.blue,
         points: 3,
       );
+
+      // Store mood in history
+      // You would implement this based on your data storage approach
     });
   }
 
   void _recordMoodDetails(String details) {
+    // Store additional mood details
+    // You would implement this based on your data storage approach
+
+    // Pet responds to details
     _geminiService.getCheckInResponse(details).then((response) {
       setState(() {
         _currentResponse = response;
