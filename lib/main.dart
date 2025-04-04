@@ -258,7 +258,7 @@ Pick one:
         _showMoodTracker(); // This uses your existing mood tracker dialog
       }
     }
-    
+
     // Show check-in prompt after widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showInitialCheckIn();
@@ -2364,7 +2364,7 @@ Pick one:
     );
   }
 
-void _showMoodTracker() {
+  void _showMoodTracker() {
     final moodOptions = [
       {'emoji': '😊', 'label': 'Happy', 'color': Colors.yellow},
       {'emoji': '😌', 'label': 'Calm', 'color': Colors.blue.shade300},
@@ -2376,112 +2376,124 @@ void _showMoodTracker() {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Text(
-          'How are you feeling today?',
-          style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 15,
-              children: moodOptions.map((mood) {
-                return InkWell(
-                  onTap: () async {  // Make async
-                    final attendanceService = AttendanceService();
-                    
-                    // Mark attendance with mood
-                    final result = await attendanceService.markAttendanceWithMood(
-                      mood['label'] as String
-                    );
-                    
-                    if (!mounted) return;
-                    Navigator.pop(context);
-                    
-                    // Record mood and show pet response
-                    _recordMood(mood['label'] as String);
-                    
-                    if (result.success) {
-                      // Show success message
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(result.message),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                      
-                      // If there's a reward, show reward dialog
-                      if (result.reward != null) {
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return AlertDialog(
-                              title: const Text('🎉 Reward!'),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text('You earned: ${result.reward!.name}'),
-                                  Text(
-                                    'Happiness boost: +${result.reward!.happinessBoost}',
-                                    style: const TextStyle(
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.bold
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              actions: [
-                                TextButton(
-                                  child: Text('Great!', style: GoogleFonts.fredoka()),
-                                  onPressed: () => Navigator.pop(context),
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      }
-                    }
-                  },
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: (mood['color'] as Color).withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          mood['emoji'] as String,
-                          style: const TextStyle(fontSize: 30),
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        mood['label'] as String,
-                        style: GoogleFonts.fredoka(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Maybe Later', style: GoogleFonts.fredoka()),
+            title: Text(
+              'How are you feeling today?',
+              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 15,
+                  children:
+                      moodOptions.map((mood) {
+                        return InkWell(
+                          onTap: () async {
+                            // Make async
+                            final attendanceService = AttendanceService();
+
+                            // Mark attendance with mood
+                            final result = await attendanceService
+                                .markAttendanceWithMood(
+                                  mood['label'] as String,
+                                );
+
+                            if (!mounted) return;
+                            Navigator.pop(context);
+
+                            // Record mood and show pet response
+                            _recordMood(mood['label'] as String);
+
+                            if (result.success) {
+                              // Show success message
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(result.message),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+
+                              // If there's a reward, show reward dialog
+                              if (result.reward != null) {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: const Text('🎉 Reward!'),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'You earned: ${result.reward!.name}',
+                                          ),
+                                          Text(
+                                            'Happiness boost: +${result.reward!.happinessBoost}',
+                                            style: const TextStyle(
+                                              color: Colors.green,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          child: Text(
+                                            'Great!',
+                                            style: GoogleFonts.fredoka(),
+                                          ),
+                                          onPressed:
+                                              () => Navigator.pop(context),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              }
+                            }
+                          },
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: (mood['color'] as Color).withOpacity(
+                                    0.2,
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  mood['emoji'] as String,
+                                  style: const TextStyle(fontSize: 30),
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                mood['label'] as String,
+                                style: GoogleFonts.fredoka(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Maybe Later', style: GoogleFonts.fredoka()),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
