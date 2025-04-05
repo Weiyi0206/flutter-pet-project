@@ -20,6 +20,18 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'screens/tests_list_screen.dart'; // Add this import
 import 'services/attendance_service.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:lottie/lottie.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import 'dart:math';
+import 'services/gemini_service.dart';
+import 'screens/chat_history_screen.dart';
+import 'screens/help_support_screen.dart';
+import 'screens/attendance_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -417,6 +429,9 @@ Pick one:
     final mightBeLonely = moodResult['lonely'] ?? false;
     final detectedMood = moodResult['mood'];
 
+    // Check for signs of distress in the message
+    _processChatMessage(userMessage);
+
     // Store the message in history
     setState(() {
       _messages.add(
@@ -487,6 +502,9 @@ Pick one:
   void _showDailyCheckIn() {
     if (!mounted) return;
 
+    final TextEditingController moodController = TextEditingController();
+    String selectedMood = 'Happy'; // Default mood
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -502,56 +520,105 @@ Pick one:
               children: [
                 const SizedBox(height: 10),
                 TextField(
+                  controller: moodController,
                   decoration: InputDecoration(
                     hintText: 'Share your mood...',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
                   ),
-                  maxLines: 2,
-                  textAlign: TextAlign.center,
-                  onSubmitted: (value) {
-                    if (value.isNotEmpty) {
-                      Navigator.pop(context);
-
-                      // Update routine item
-                      setState(() {
-                        _dailyRoutineItems["Morning check-in"] = true;
-                      });
-
-                      // Get AI response to check-in
-                      _geminiService.getCheckInResponse(value).then((response) {
-                        setState(() {
-                          _currentResponse = response;
-                        });
-
-                        // Clear message after delay
-                        Future.delayed(const Duration(seconds: 15), () {
-                          if (mounted && _currentResponse == response) {
-                            setState(() {
-                              _currentResponse = null;
-                            });
-                          }
-                        });
-                      });
-                    }
-                  },
+                ),
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _buildMoodOption('😊', 'Happy', Colors.yellow, (mood) {
+                      selectedMood = mood;
+                    }),
+                    _buildMoodOption('😌', 'Calm', Colors.blue.shade300, (
+                      mood,
+                    ) {
+                      selectedMood = mood;
+                    }),
+                    _buildMoodOption('😐', 'Neutral', Colors.grey.shade400, (
+                      mood,
+                    ) {
+                      selectedMood = mood;
+                    }),
+                    _buildMoodOption('😔', 'Sad', Colors.indigo.shade300, (
+                      mood,
+                    ) {
+                      selectedMood = mood;
+                    }),
+                    _buildMoodOption('😡', 'Angry', Colors.red.shade400, (
+                      mood,
+                    ) {
+                      selectedMood = mood;
+                    }),
+                    _buildMoodOption('😰', 'Anxious', Colors.purple.shade300, (
+                      mood,
+                    ) {
+                      selectedMood = mood;
+                    }),
+                  ],
                 ),
               ],
             ),
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.pop(context);
+                  Navigator.of(context).pop();
                 },
-                child: Text('Maybe Later', style: GoogleFonts.fredoka()),
+                child: Text('Later', style: GoogleFonts.fredoka()),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final moodText = moodController.text.trim();
+                  Navigator.of(context).pop();
+
+                  // Process the selected mood
+                  _updateMoodTracking(selectedMood);
+
+                  // Check for distress in their text description
+                  if (moodText.isNotEmpty) {
+                    _checkUserDistress(moodText, selectedMood);
+                  }
+
+                  // Proceed with marking attendance
+                  final attendanceService = AttendanceService();
+                  await attendanceService.markAttendanceWithMood(selectedMood);
+                },
+                child: Text('Submit', style: GoogleFonts.fredoka()),
               ),
             ],
           ),
+    );
+  }
+
+  Widget _buildMoodOption(
+    String emoji,
+    String label,
+    Color color,
+    Function(String) onSelected,
+  ) {
+    return GestureDetector(
+      onTap: () => onSelected(label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color, width: 1),
+        ),
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 24)),
+            Text(label, style: GoogleFonts.fredoka(fontSize: 12)),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1907,133 +1974,140 @@ Pick one:
     );
   }
 
-  // Add this helper method to detect mood from text
-  Map<String, dynamic> _detectMoodFromText(String text) {
-    final result = {
-      'mood': null as String?, // Explicitly type as String? instead of bool?
-      'lonely': false,
-      'anxious': false,
-      'sad': false,
-      'angry': false,
-    };
+  // Track consecutive negative chat messages
+  int _consecutiveNegativeChats = 0;
 
+  // Detect mood from a text message
+  Map<String, dynamic> _detectMoodFromText(String text) {
     final lowerText = text.toLowerCase();
 
-    // Detect loneliness
-    final lonelyKeywords = [
-      'lonely',
+    // Words indicating possible loneliness
+    final lonelyWords = [
       'alone',
+      'lonely',
       'no one',
       'by myself',
       'no friends',
-      'isolated',
-      'abandoned',
-      'nobody',
       'miss',
       'missing',
+      'abandoned',
+      'empty',
+      'isolated',
+      'excluded',
+      'left out',
     ];
 
-    // Detect anxiety
-    final anxiousKeywords = [
-      'anxious',
-      'nervous',
-      'worry',
-      'worried',
-      'stress',
-      'stressed',
-      'panic',
-      'fear',
-      'afraid',
-      'scared',
-    ];
-
-    // Detect sadness
-    final sadKeywords = [
+    // Words indicating sadness
+    final sadWords = [
       'sad',
       'unhappy',
       'depressed',
       'down',
       'blue',
-      'miserable',
-      'heartbroken',
       'upset',
       'cry',
       'crying',
+      'tears',
+      'heartbroken',
+      'devastated',
+      'miserable',
+      'grief',
     ];
 
-    // Detect anger
-    final angryKeywords = [
+    // Words indicating anxiety
+    final anxiousWords = [
+      'anxious',
+      'worried',
+      'panic',
+      'stress',
+      'nervous',
+      'fear',
+      'scared',
+      'afraid',
+      'uneasy',
+      'tense',
+      'dread',
+      'frightened',
+      'terrified',
+    ];
+
+    // Words indicating anger
+    final angryWords = [
       'angry',
       'mad',
       'furious',
       'rage',
       'hate',
       'annoyed',
-      'irritated',
       'frustrated',
+      'irritated',
       'upset',
+      'outraged',
+      'livid',
+      'hostile',
     ];
 
-    // Detect positive emotions
-    final positiveKeywords = [
+    // Words indicating happiness
+    final happyWords = [
       'happy',
+      'glad',
       'joy',
       'excited',
+      'thrilled',
+      'pleased',
+      'delighted',
+      'content',
+      'cheerful',
       'great',
-      'good',
       'wonderful',
       'fantastic',
-      'amazing',
-      'love',
-      'glad',
+      'awesome',
     ];
 
-    // Check for each emotion type
-    for (final keyword in lonelyKeywords) {
-      if (lowerText.contains(keyword)) {
-        result['lonely'] = true;
-        break;
-      }
-    }
+    // Check for emotions in the text
+    final isLonely = lonelyWords.any((word) => lowerText.contains(word));
+    final isSad = sadWords.any((word) => lowerText.contains(word));
+    final isAnxious = anxiousWords.any((word) => lowerText.contains(word));
+    final isAngry = angryWords.any((word) => lowerText.contains(word));
+    final isHappy = happyWords.any((word) => lowerText.contains(word));
 
-    for (final keyword in anxiousKeywords) {
-      if (lowerText.contains(keyword)) {
-        result['anxious'] = true;
-        break;
-      }
-    }
+    // Track consecutive negative messages for potential interventions
+    if (isSad || isAnxious || isAngry || isLonely) {
+      _consecutiveNegativeChats++;
 
-    for (final keyword in sadKeywords) {
-      if (lowerText.contains(keyword)) {
-        result['sad'] = true;
-        break;
+      // If user has had several negative chat messages in a row, consider suggesting help
+      if (_consecutiveNegativeChats >= _negativeThreshold) {
+        // Schedule the help suggestion for after the AI response
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            _showHelpSuggestion();
+          }
+        });
+        _consecutiveNegativeChats = 0; // Reset after showing help
       }
-    }
-
-    for (final keyword in angryKeywords) {
-      if (lowerText.contains(keyword)) {
-        result['angry'] = true;
-        break;
-      }
+    } else if (isHappy) {
+      _consecutiveNegativeChats = 0; // Reset on positive messages
     }
 
     // Determine overall mood
-    if (result['lonely'] == true ||
-        result['anxious'] == true ||
-        result['sad'] == true ||
-        result['angry'] == true) {
-      result['mood'] = 'negative';
-    } else {
-      // Check for positive emotions
-      for (final keyword in positiveKeywords) {
-        if (lowerText.contains(keyword)) {
-          result['mood'] = 'positive';
-          break;
-        }
-      }
-    }
+    String mood = 'Neutral';
+    if (isHappy)
+      mood = 'Happy';
+    else if (isSad)
+      mood = 'Sad';
+    else if (isAnxious)
+      mood = 'Anxious';
+    else if (isAngry)
+      mood = 'Angry';
 
-    return result;
+    return {
+      'mood': mood,
+      'lonely': isLonely,
+      'sad': isSad,
+      'anxious': isAnxious,
+      'angry': isAngry,
+      'happy': isHappy,
+    };
   }
 
   void _showAchievements() {
@@ -2582,6 +2656,223 @@ Pick one:
     } else if (mood == "Angry") {
       _startBreathingExercise();
     }
+  }
+
+  // Method to detect user distress and offer help resources
+  void _checkUserDistress(String message, String mood) {
+    // List of high-risk critical keywords that require immediate attention
+    final criticalKeywords = [
+      'suicide',
+      'suicidal',
+      'kill myself',
+      'end my life',
+      'want to die',
+      'die',
+      'death',
+      'don\'t want to live',
+      'end it all',
+      'no reason to live',
+      'better off dead',
+      'can\'t go on',
+      'giving up',
+      'goodbye',
+      'final goodbye',
+    ];
+
+    // List of distress keywords to check for in messages
+    final distressKeywords = [
+      'sad',
+      'depressed',
+      'depression',
+      'anxiety',
+      'anxious',
+      'worried',
+      'stress',
+      'stressed',
+      'overwhelmed',
+      'lonely',
+      'alone',
+      'hopeless',
+      'worthless',
+      'desperate',
+      'miserable',
+      'unhappy',
+      'suffering',
+      'pain',
+      'hurt',
+      'crying',
+      'tears',
+      'broken',
+      'empty',
+      'numb',
+      'tired of',
+      'exhausted',
+      'hate myself',
+    ];
+
+    // List of negative moods from daily check-ins to track
+    final negativeMoods = ['Sad', 'Angry', 'Anxious'];
+
+    // Convert message to lowercase for case-insensitive matching
+    final lowerMessage = message.toLowerCase();
+
+    // First check for critical high-risk keywords - these get immediate response
+    final containsCriticalKeywords = criticalKeywords.any(
+      (keyword) => lowerMessage.contains(keyword),
+    );
+
+    if (containsCriticalKeywords) {
+      // Immediately show help suggestion for critical keywords
+      _showHelpSuggestion(highPriority: true);
+      return; // Exit early, no need to check other conditions
+    }
+
+    // Check for other distress keywords
+    final containsDistressKeywords = distressKeywords.any(
+      (keyword) => lowerMessage.contains(keyword),
+    );
+
+    // Check if current mood is negative
+    final isNegativeMood = negativeMoods.contains(mood);
+
+    // If we detect distress or consistently negative moods, show help suggestion
+    if (containsDistressKeywords || isNegativeMood) {
+      _showHelpSuggestion();
+    }
+  }
+
+  // Keep track of consecutive negative mood check-ins
+  int _consecutiveNegativeMoods = 0;
+  final int _negativeThreshold =
+      3; // Show suggestion after 3 consecutive negative moods
+
+  // Update negative mood counter and check if we should suggest help
+  void _updateMoodTracking(String mood) {
+    final negativeMoods = ['Sad', 'Angry', 'Anxious'];
+
+    if (negativeMoods.contains(mood)) {
+      _consecutiveNegativeMoods++;
+
+      // If user has had several negative moods in a row, suggest help
+      if (_consecutiveNegativeMoods >= _negativeThreshold) {
+        _showHelpSuggestion();
+      }
+    } else {
+      // Reset counter if mood is positive
+      _consecutiveNegativeMoods = 0;
+    }
+  }
+
+  // Show a suggestion to visit help resources
+  void _showHelpSuggestion({bool highPriority = false}) {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible:
+          !highPriority, // Cannot dismiss by tapping outside if high priority
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Icon(
+                    highPriority ? Icons.warning : Icons.pets,
+                    color:
+                        highPriority
+                            ? Colors.red
+                            : Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    highPriority
+                        ? 'Important support message'
+                        : 'A message from your pet',
+                    style: GoogleFonts.fredoka(
+                      fontWeight: FontWeight.bold,
+                      color: highPriority ? Colors.red : null,
+                    ),
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
+                  ),
+                ),
+              ],
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+            contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    highPriority
+                        ? 'Your wellbeing matters. If you\'re thinking about harming yourself, please know that help is available and you are not alone. Let me show you some immediate support resources.'
+                        : 'You seem like you\'re having a tough time. Sometimes talking to someone helps. Would you like me to show you some help resources?',
+                    style: GoogleFonts.fredoka(),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    height: 100,
+                    child: Image.asset(
+                      highPriority
+                          ? 'assets/animations/support_pet.gif'
+                          : 'assets/animations/concerned_pet.gif',
+                      errorBuilder:
+                          (context, error, stackTrace) => Icon(
+                            highPriority ? Icons.support : Icons.pets,
+                            size: 60,
+                            color:
+                                highPriority
+                                    ? Colors.red
+                                    : Theme.of(context).colorScheme.primary,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            actions: [
+              if (!highPriority) // Only show "Not now" for standard priority
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Not now', style: GoogleFonts.fredoka()),
+                ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HelpSupportScreen(),
+                    ),
+                  );
+                },
+                style:
+                    highPriority
+                        ? ElevatedButton.styleFrom(backgroundColor: Colors.red)
+                        : null,
+                child: Text(
+                  highPriority ? 'Get help now' : 'Show resources',
+                  style: GoogleFonts.fredoka(
+                    color: highPriority ? Colors.white : null,
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
+  // Method to be called when processing chat messages
+  void _processChatMessage(String message) {
+    // Pass an empty mood since this is from chat, not check-in
+    _checkUserDistress(message, '');
   }
 }
 
