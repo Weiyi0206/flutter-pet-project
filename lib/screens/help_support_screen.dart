@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:helloworld/services/places_service.dart';
 import 'package:helloworld/services/helpdata_service.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class HelpSupportScreen extends StatefulWidget {
   const HelpSupportScreen({super.key});
@@ -286,7 +287,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Help & Support'),
+          title: Text(
+            'Help & Support',
+            style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+          ),
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.phone), text: 'Helplines'),

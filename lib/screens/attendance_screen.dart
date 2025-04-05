@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:helloworld/services/attendance_service.dart';
 import 'package:helloworld/widgets/attendance_calendar.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -196,7 +197,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Daily Attendance')),
+      appBar: AppBar(
+        title: Text(
+          'Daily Attendance',
+          style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+        ),
+      ),
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())

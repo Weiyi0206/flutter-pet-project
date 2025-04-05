@@ -32,6 +32,7 @@ import 'services/gemini_service.dart';
 import 'screens/chat_history_screen.dart';
 import 'screens/help_support_screen.dart';
 import 'screens/attendance_screen.dart';
+import 'screens/diary_screen.dart'; // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1521,6 +1522,25 @@ Pick one:
                                       label: 'Wellness',
                                       onPressed: _showStressReliefOptions,
                                       color: Colors.green,
+                                      size: isSmallScreen ? 40 : 50,
+                                    ),
+                                    SizedBox(
+                                      width: constraints.maxWidth * 0.05,
+                                    ),
+                                    _buildFeatureButton(
+                                      icon: Icons.book,
+                                      label: 'Diary',
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) =>
+                                                    const DiaryScreen(),
+                                          ),
+                                        );
+                                      },
+                                      color: Colors.indigo,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
                                     SizedBox(
