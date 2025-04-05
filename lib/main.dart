@@ -19,6 +19,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'screens/tests_list_screen.dart'; // Add this import
+import 'services/attendance_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -188,7 +189,7 @@ Pick one:
   bool _hasCheckedInToday = false;
   DateTime? _lastCheckInDate;
   String? _currentMood;
-  List<String> _moodOptions = [
+  final List<String> _moodOptions = [
     '😊 Happy',
     '😐 Neutral',
     '😔 Sad',
@@ -219,14 +220,14 @@ Pick one:
 
   bool _isVisualizationActive = false;
 
-  Map<String, bool> _dailyRoutineItems = {
+  final Map<String, bool> _dailyRoutineItems = {
     "Morning check-in": false,
     "Hydration reminder": false,
     "Movement break": false,
     "Evening reflection": false,
   };
 
-  List<String> _affirmations = [
+  final List<String> _affirmations = [
     "You are enough just as you are.",
     "You're doing better than you think.",
     "Small steps forward are still progress.",
@@ -248,6 +249,21 @@ Pick one:
   @override
   void initState() {
     super.initState();
+
+    void _showInitialCheckIn() async {
+      final attendanceService = AttendanceService();
+
+      if (await attendanceService.shouldShowCheckInPrompt()) {
+        if (!mounted) return;
+
+        _showMoodTracker(); // This uses your existing mood tracker dialog
+      }
+    }
+
+    // Show check-in prompt after widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showInitialCheckIn();
+    });
 
     // Initialize pet status
     _updatePetStatus();
@@ -2397,11 +2413,75 @@ Pick one:
                   children:
                       moodOptions.map((mood) {
                         return InkWell(
-                          onTap: () {
-                            // Record the selected mood
-                            _recordMood(mood['label'] as String);
+                          onTap: () async {
+                            // Make async
+                            final attendanceService = AttendanceService();
+
+                            // Mark attendance with mood
+                            final result = await attendanceService
+                                .markAttendanceWithMood(
+                                  mood['label'] as String,
+                                );
+
+                            if (!mounted) return;
                             Navigator.pop(context);
+
+                            // Record mood and show pet response
+                            _recordMood(mood['label'] as String);
+
+                            if (result.success) {
+                              // Show success message
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(result.message),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+
+                              // If there's a reward, show reward dialog
+                              if (result.reward != null) {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: const Text('🎉 Reward!'),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'You earned: ${result.reward!.name}',
+                                          ),
+                                          Text(
+                                            'Happiness boost: +${result.reward!.happinessBoost}',
+                                            style: const TextStyle(
+                                              color: Colors.green,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          child: Text(
+                                            'Great!',
+                                            style: GoogleFonts.fredoka(),
+                                          ),
+                                          onPressed:
+                                              () => Navigator.pop(context),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              }
+                            }
                           },
+                          // onTap:
+                          // () {
+                          //   // Record the selected mood
+                          //   _recordMood(mood['label'] as String);
+                          //   Navigator.pop(context);
+                          // };
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
