@@ -18,8 +18,10 @@ import 'widgets/happiness_meter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
-import 'screens/tests_list_screen.dart'; // Add this import
+import 'screens/tests_list_screen.dart'; 
 import 'services/attendance_service.dart';
+import 'screens/emotion_history_screen.dart';
+import 'services/emotion_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -240,6 +242,8 @@ Pick one:
 
   bool _showInteractionsPanel = false;
 
+  final EmotionService _emotionService = EmotionService();
+
   void _toggleInteractionsPanel() {
     setState(() {
       _showInteractionsPanel = !_showInteractionsPanel;
@@ -271,41 +275,14 @@ Pick one:
     // Check connection to AI service
     _checkAIConnection();
 
-    // Start tip timer
+    // Optional: Keep basic tips for pet care
     _startTipTimer();
 
-    // Schedule routine check
-    Timer.periodic(const Duration(hours: 3), (timer) {
-      if (mounted) {
-        _checkRoutineProgress();
-      }
-    });
-
-    // Schedule random wellness prompts
-    Timer.periodic(const Duration(minutes: 45), (timer) {
+    // Schedule companionship prompts
+    Timer.periodic(const Duration(minutes: 60), (timer) {
       if (mounted && _currentResponse == null) {
-        // Choose a random support feature based on time of day and randomness
-        final now = DateTime.now();
         final rand = _random.nextDouble();
-
-        if (now.hour < 10 && rand < 0.3) {
-          // Morning: Routine reminder
-          _showRoutineTracker();
-        } else if (now.hour >= 10 && now.hour < 14 && rand < 0.3) {
-          // Mid-day: Stress relief
-          _showQuickStressRelief();
-        } else if (now.hour >= 14 && now.hour < 18 && rand < 0.3) {
-          // Afternoon: Small activity
-          _showSmallActivityPrompt();
-        } else if (now.hour >= 18 && rand < 0.3) {
-          // Evening: Affirmation or breathing
-          if (_random.nextBool()) {
-            _showAffirmation();
-          } else {
-            _startBreathingExercise();
-          }
-        } else if (rand < 0.2) {
-          // Random companionship prompt
+        if (rand < 0.4) {  // 40% chance each hour
           _showCompanionshipPrompt();
         }
       }
@@ -412,9 +389,12 @@ Pick one:
     final timeString =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
-    // Detect mood from the message
+    // Enhanced mood detection from the message
     final moodResult = _detectMoodFromText(userMessage);
-    final mightBeLonely = moodResult['lonely'] ?? false;
+    final hasEmotionalContent = moodResult['lonely'] == true || 
+                               moodResult['anxious'] == true || 
+                               moodResult['sad'] == true || 
+                               moodResult['angry'] == true;
     final detectedMood = moodResult['mood'];
 
     // Store the message in history
@@ -430,13 +410,20 @@ Pick one:
     });
 
     try {
-      // Get response from AI service
-      final response = await _geminiService.getChatResponse(
-        userMessage,
-        _happiness,
-        _petStatus,
-        mightBeLonely,
-      );
+      String response;
+      
+      // Use the enhanced mental health response if emotional content is detected
+      if (hasEmotionalContent) {
+        response = await _geminiService.getMentalHealthResponse(userMessage, moodResult);
+      } else {
+        // Otherwise use the standard chat response
+        response = await _geminiService.getChatResponse(
+          userMessage,
+          _happiness,
+          _petStatus,
+          moodResult['lonely'] ?? false,
+        );
+      }
 
       // Store the response in history and show it
       if (mounted) {
@@ -446,12 +433,9 @@ Pick one:
           );
           _currentResponse = response;
 
-          // Adjust happiness based on detected mood
-          if (mightBeLonely) {
-            _happiness = min(
-              _happiness + 5,
-              100,
-            ); // Small happiness boost for sharing
+          // Adjust happiness based on detected mood - reward the user for sharing
+          if (hasEmotionalContent) {
+            _happiness = min(_happiness + 5, 100); // Happiness boost for emotional sharing
           }
 
           // Additional happiness adjustments based on detected mood
@@ -459,14 +443,16 @@ Pick one:
             if (detectedMood == 'positive') {
               _happiness = min(_happiness + 3, 100);
             } else if (detectedMood == 'negative') {
-              _happiness = max(_happiness - 2, 0);
+              // No negative adjustment - don't penalize negative emotions
+              // Instead give a small boost for sharing
+              _happiness = min(_happiness + 1, 100);
             }
           }
 
           _updatePetStatus();
         });
 
-        // Remove pet response after 15 seconds
+        // Remove pet response after a delay
         Future.delayed(const Duration(seconds: 15), () {
           if (mounted && _currentResponse == response) {
             setState(() {
@@ -1304,6 +1290,16 @@ Pick one:
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.emoji_emotions),
+            tooltip: 'Emotion History',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const EmotionHistoryScreen()),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.calendar_today),
             onPressed: () {
               Navigator.push(
@@ -1323,6 +1319,7 @@ Pick one:
           ),
           IconButton(
             icon: const Icon(Icons.history),
+            tooltip: 'Chat History',
             onPressed: () {
               Navigator.push(
                 context,
@@ -1450,20 +1447,20 @@ Pick one:
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     _buildFeatureButton(
-                                      icon: Icons.spa,
-                                      label: 'Wellness',
-                                      onPressed: _showStressReliefOptions,
-                                      color: Colors.green,
+                                      icon: Icons.pets,
+                                      label: 'Pet',
+                                      onPressed: _petThePet,
+                                      color: Colors.purple,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
                                     SizedBox(
                                       width: constraints.maxWidth * 0.05,
                                     ),
                                     _buildFeatureButton(
-                                      icon: Icons.pets,
-                                      label: 'Interact',
-                                      onPressed: _toggleInteractionsPanel,
-                                      color: Colors.purple,
+                                      icon: Icons.restaurant,
+                                      label: 'Feed',
+                                      onPressed: _feedThePet,
+                                      color: Colors.orange,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
                                     SizedBox(
@@ -1907,85 +1904,56 @@ Pick one:
     );
   }
 
-  // Add this helper method to detect mood from text
+  // Enhanced mood detection for Gemini integration
   Map<String, dynamic> _detectMoodFromText(String text) {
     final result = {
-      'mood': null as String?, // Explicitly type as String? instead of bool?
+      'mood': null as String?,
       'lonely': false,
       'anxious': false,
       'sad': false,
       'angry': false,
+      'context': <String>[], // Initialize as a proper List<String>
     };
 
     final lowerText = text.toLowerCase();
 
     // Detect loneliness
     final lonelyKeywords = [
-      'lonely',
-      'alone',
-      'no one',
-      'by myself',
-      'no friends',
-      'isolated',
-      'abandoned',
-      'nobody',
-      'miss',
-      'missing',
+      'lonely', 'alone', 'no one', 'by myself', 'no friends', 'isolated', 
+      'abandoned', 'nobody', 'miss', 'missing', 'empty',
     ];
 
     // Detect anxiety
     final anxiousKeywords = [
-      'anxious',
-      'nervous',
-      'worry',
-      'worried',
-      'stress',
-      'stressed',
-      'panic',
-      'fear',
-      'afraid',
-      'scared',
+      'anxious', 'nervous', 'worry', 'worried', 'stress', 'stressed', 
+      'panic', 'fear', 'afraid', 'scared', 'overwhelming', 'overthinking',
     ];
 
     // Detect sadness
     final sadKeywords = [
-      'sad',
-      'unhappy',
-      'depressed',
-      'down',
-      'blue',
-      'miserable',
-      'heartbroken',
-      'upset',
-      'cry',
-      'crying',
+      'sad', 'unhappy', 'depressed', 'down', 'blue', 'miserable', 
+      'heartbroken', 'upset', 'cry', 'crying', 'hopeless', 'lost',
     ];
 
     // Detect anger
     final angryKeywords = [
-      'angry',
-      'mad',
-      'furious',
-      'rage',
-      'hate',
-      'annoyed',
-      'irritated',
-      'frustrated',
-      'upset',
+      'angry', 'mad', 'furious', 'rage', 'hate', 'annoyed', 
+      'irritated', 'frustrated', 'upset', 'pissed',
     ];
 
     // Detect positive emotions
     final positiveKeywords = [
-      'happy',
-      'joy',
-      'excited',
-      'great',
-      'good',
-      'wonderful',
-      'fantastic',
-      'amazing',
-      'love',
-      'glad',
+      'happy', 'joy', 'excited', 'great', 'good', 'wonderful', 
+      'fantastic', 'amazing', 'love', 'glad', 'blessed', 'grateful',
+    ];
+
+    // Context patterns to detect
+    final contextPatterns = [
+      {'pattern': ['school', 'class', 'homework', 'study', 'exam', 'test'], 'context': 'education'},
+      {'pattern': ['work', 'job', 'boss', 'colleague', 'meeting', 'deadline'], 'context': 'work'},
+      {'pattern': ['friend', 'relationship', 'date', 'breakup', 'family', 'parent'], 'context': 'relationships'},
+      {'pattern': ['tired', 'sleep', 'insomnia', 'exhausted', 'rest', 'fatigue'], 'context': 'sleep/energy'},
+      {'pattern': ['health', 'sick', 'pain', 'doctor', 'hospital', 'illness'], 'context': 'health'},
     ];
 
     // Check for each emotion type
@@ -2017,11 +1985,20 @@ Pick one:
       }
     }
 
+    // Detect context
+    for (final contextData in contextPatterns) {
+      for (final keyword in contextData['pattern'] as List<String>) {
+        if (lowerText.contains(keyword)) {
+          // Now we can safely add to the list
+          (result['context'] as List<String>).add(contextData['context'] as String);
+          break;
+        }
+      }
+    }
+
     // Determine overall mood
-    if (result['lonely'] == true ||
-        result['anxious'] == true ||
-        result['sad'] == true ||
-        result['angry'] == true) {
+    if (result['lonely'] == true || result['anxious'] == true || 
+        result['sad'] == true || result['angry'] == true) {
       result['mood'] = 'negative';
     } else {
       // Check for positive emotions
@@ -2392,196 +2369,166 @@ Pick one:
 
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: Text(
-              'How are you feeling today?',
-              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 10),
-                // Emoji mood selector
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 15,
-                  children:
-                      moodOptions.map((mood) {
-                        return InkWell(
-                          onTap: () async {
-                            // Make async
-                            final attendanceService = AttendanceService();
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          'How are you feeling today?',
+          style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            // Emoji mood selector
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 15,
+              children: moodOptions.map((mood) {
+                return InkWell(
+                  onTap: () async {
+                    // Make async
+                    final attendanceService = AttendanceService();
 
-                            // Mark attendance with mood
-                            final result = await attendanceService
-                                .markAttendanceWithMood(
-                                  mood['label'] as String,
-                                );
+                    // Mark attendance with mood
+                    final result = await attendanceService.markAttendanceWithMood(
+                      mood['label'] as String,
+                    );
 
-                            if (!mounted) return;
-                            Navigator.pop(context);
+                    if (!mounted) return;
+                    Navigator.pop(context);
 
-                            // Record mood and show pet response
-                            _recordMood(mood['label'] as String);
+                    // Record mood and show pet response
+                    _recordMood(mood['label'] as String);
 
-                            if (result.success) {
-                              // Show success message
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(result.message),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
+                    if (result.success) {
+                      // Show success message
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(result.message),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
 
-                              // If there's a reward, show reward dialog
-                              if (result.reward != null) {
-                                showDialog(
-                                  context: context,
-                                  builder: (BuildContext context) {
-                                    return AlertDialog(
-                                      title: const Text('🎉 Reward!'),
-                                      content: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            'You earned: ${result.reward!.name}',
-                                          ),
-                                          Text(
-                                            'Happiness boost: +${result.reward!.happinessBoost}',
-                                            style: const TextStyle(
-                                              color: Colors.green,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          child: Text(
-                                            'Great!',
-                                            style: GoogleFonts.fredoka(),
-                                          ),
-                                          onPressed:
-                                              () => Navigator.pop(context),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              }
-                            }
-                          },
-                          // onTap:
-                          // () {
-                          //   // Record the selected mood
-                          //   _recordMood(mood['label'] as String);
-                          //   Navigator.pop(context);
-                          // };
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: (mood['color'] as Color).withOpacity(
-                                    0.2,
+                      // If there's a reward, show reward dialog
+                      if (result.reward != null) {
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              title: const Text('🎉 Reward!'),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('You earned: ${result.reward!.name}'),
+                                  Text(
+                                    'Happiness boost: +${result.reward!.happinessBoost}',
+                                    style: const TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Text(
-                                  mood['emoji'] as String,
-                                  style: const TextStyle(fontSize: 30),
-                                ),
+                                ],
                               ),
-                              const SizedBox(height: 5),
-                              Text(
-                                mood['label'] as String,
-                                style: GoogleFonts.fredoka(fontSize: 12),
-                              ),
-                            ],
-                          ),
+                              actions: [
+                                TextButton(
+                                  child:
+                                      Text('Great!', style: GoogleFonts.fredoka()),
+                                  onPressed: () => Navigator.pop(context),
+                                ),
+                              ],
+                            );
+                          },
                         );
-                      }).toList(),
-                ),
-              ],
+                      }
+                    }
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: (mood['color'] as Color).withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          mood['emoji'] as String,
+                          style: const TextStyle(fontSize: 30),
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        mood['label'] as String,
+                        style: GoogleFonts.fredoka(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Maybe Later', style: GoogleFonts.fredoka()),
-              ),
-            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Maybe Later', style: GoogleFonts.fredoka()),
           ),
+        ],
+      ),
     );
   }
 
   void _recordMood(String mood) {
     setState(() {
+      // Save the current mood for pet interaction and gemini context
+      _currentMood = mood;
+      
       // Update pet response based on mood
       if (mood == "Happy" || mood == "Calm") {
-        _currentResponse =
-            "I'm glad you're feeling $mood today! That's wonderful!";
+        _currentResponse = "I'm glad you're feeling $mood today! That's wonderful!";
+        _happiness = min(_happiness + 5, 100);
       } else if (mood == "Sad" || mood == "Angry" || mood == "Anxious") {
-        _currentResponse =
-            "I see you're feeling $mood. Remember I'm here for you. Would you like to try a quick wellness activity?";
-        // Optionally suggest relevant wellness activities
-        Future.delayed(const Duration(seconds: 5), () {
-          if (mounted && _currentResponse?.contains(mood) == true) {
-            _showRelevantWellnessOptions(mood);
-          }
-        });
+        _currentResponse = "I see you're feeling $mood. Remember I'm here for you.";
+        // Give a smaller happiness boost for sharing difficult emotions
+        _happiness = min(_happiness + 2, 100);
       } else {
         _currentResponse = "Thanks for sharing how you're feeling today!";
+        _happiness = min(_happiness + 3, 100);
       }
-
-      // Add achievement for tracking mood
-      _addAchievement(
-        "Tracked daily mood",
-        icon: Icons.mood,
-        color: Colors.blue,
-        points: 3,
-      );
-
-      // Store mood in history
-      // You would implement this based on your data storage approach
+      
+      _updatePetStatus();
     });
-  }
-
-  void _recordMoodDetails(String details) {
-    // Store additional mood details
-    // You would implement this based on your data storage approach
-
-    // Pet responds to details
-    _geminiService.getCheckInResponse(details).then((response) {
-      setState(() {
-        _currentResponse = response;
-      });
-
-      // Clear message after delay
-      Future.delayed(const Duration(seconds: 15), () {
-        if (mounted && _currentResponse == response) {
+    
+    // Record the emotion using our EmotionService
+    _emotionService.recordEmotion(mood).then((_) {
+      print('Emotion recorded successfully: $mood');
+    }).catchError((error) {
+      print('Error recording emotion: $error');
+    });
+    
+    // Send mood to Gemini service for contextual awareness in future interactions
+    _geminiService.getCheckInResponse(mood).then((response) {
+      // Update the response after a small delay to show the initial acknowledgment first
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
           setState(() {
-            _currentResponse = null;
+            _currentResponse = response;
+            
+            // Clear message after delay
+            Future.delayed(const Duration(seconds: 12), () {
+              if (mounted && _currentResponse == response) {
+                setState(() {
+                  _currentResponse = null;
+                });
+              }
+            });
           });
         }
       });
     });
-  }
-
-  void _showRelevantWellnessOptions(String mood) {
-    // Show relevant wellness activities based on mood
-    if (mood == "Anxious") {
-      _showStressReliefOptions();
-    } else if (mood == "Sad") {
-      _showSelfEsteemBuilder();
-    } else if (mood == "Angry") {
-      _startBreathingExercise();
-    }
   }
 }
 
@@ -2605,46 +2552,6 @@ class BubbleTrianglePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class PetPainter extends CustomPainter {
-  final Color color;
-
-  PetPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint =
-        Paint()
-          ..color = color
-          ..style = PaintingStyle.fill;
-
-    final pixelSize = size.width / 8;
-    final pixels = [
-      [0, 0, 1, 1, 1, 1, 0, 0],
-      [0, 1, 1, 1, 1, 1, 1, 0],
-      [1, 1, 0, 1, 1, 0, 1, 1],
-      [1, 1, 1, 1, 1, 1, 1, 1],
-      [1, 1, 1, 1, 1, 1, 1, 1],
-      [0, 1, 1, 1, 1, 1, 1, 0],
-      [0, 0, 1, 0, 0, 1, 0, 0],
-      [0, 0, 1, 1, 1, 1, 0, 0],
-    ];
-
-    for (var y = 0; y < pixels.length; y++) {
-      for (var x = 0; x < pixels[y].length; x++) {
-        if (pixels[y][x] == 1) {
-          canvas.drawRect(
-            Rect.fromLTWH(x * pixelSize, y * pixelSize, pixelSize, pixelSize),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
 class ChatMessage {
