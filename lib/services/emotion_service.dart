@@ -72,14 +72,14 @@ class EmotionService {
       
       print('DEBUG: Fetching emotions since $startDateStr for user $userId');
 
-      // First, get data from Firestore - use only one orderBy clause to avoid index errors
+      // First, get data from Firestore
       final querySnapshot = await _firestore
           .collection('users')
           .doc(userId)
           .collection('emotions')
           .where('date', isGreaterThanOrEqualTo: startDateStr)
           .orderBy('date', descending: true)
-          // Removed second orderBy('time') to avoid needing a composite index
+          .orderBy('time', descending: true)
           .get();
 
       print('DEBUG: Found ${querySnapshot.docs.length} emotion records in Firestore');
