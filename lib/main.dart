@@ -1049,226 +1049,6 @@ Pick one:
     );
   }
 
-  void _showMentalHealthTools() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder:
-          (context) => Container(
-            padding: const EdgeInsets.all(20),
-            height: MediaQuery.of(context).size.height * 0.7,
-            child: Column(
-              children: [
-                Text(
-                  'Wellness Tools',
-                  style: GoogleFonts.fredoka(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  'Tools to support your mental wellbeing',
-                  style: GoogleFonts.fredoka(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-
-                // Categories
-                Row(
-                  children: [
-                    _buildCategoryTab(
-                      icon: Icons.sentiment_satisfied_alt,
-                      label: 'Mood',
-                      color: Colors.blue,
-                    ),
-                    _buildCategoryTab(
-                      icon: Icons.spa,
-                      label: 'Calm',
-                      color: Colors.green,
-                    ),
-                    _buildCategoryTab(
-                      icon: Icons.psychology,
-                      label: 'Mind',
-                      color: Colors.purple,
-                    ),
-                    _buildCategoryTab(
-                      icon: Icons.favorite,
-                      label: 'Self',
-                      color: Colors.red,
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-                Expanded(
-                  child: GridView.count(
-                    crossAxisCount: 3,
-                    childAspectRatio: 0.85,
-                    crossAxisSpacing: 15,
-                    mainAxisSpacing: 15,
-                    children: [
-                      _buildToolButton(
-                        icon: Icons.air,
-                        label: 'Breathing',
-                        color: Colors.blue,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _startBreathingExercise();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.spa,
-                        label: 'Grounding',
-                        color: Colors.green,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _startGroundingExercise();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.psychology,
-                        label: 'Small Win',
-                        color: Colors.purple,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showSmallActivityPrompt();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.beach_access,
-                        label: 'Visualize',
-                        color: Colors.orange,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _startVisualizationExercise();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.schedule,
-                        label: 'Routine',
-                        color: Colors.indigo,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showRoutineTracker();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.favorite,
-                        label: 'Affirmation',
-                        color: Colors.red,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showAffirmation();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.fitness_center,
-                        label: 'Stress Relief',
-                        color: Colors.teal,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showStressReliefOptions();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.star,
-                        label: 'Strengths',
-                        color: Colors.amber,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showSelfEsteemBuilder();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.emoji_events,
-                        label: 'Achievements',
-                        color: Colors.deepOrange,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showAchievements();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  Widget _buildCategoryTab({
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: color, width: 3)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: GoogleFonts.fredoka(
-                color: color,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToolButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          border: Border(
-            right: BorderSide(color: Colors.grey.shade300, width: 1),
-          ),
-        ),
-        child: TextButton(
-          onPressed: onPressed,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: GoogleFonts.fredoka(
-                  color: color,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
@@ -2090,211 +1870,6 @@ Pick one:
     );
   }
 
-  // Add this method for quick stress relief
-  void _showStressReliefOptions() {
-    final reliefOptions = [
-      {
-        "title": "Box Breathing",
-        "description":
-            "Breathe in for 4 counts, hold for 4, exhale for 4, hold for 4. Repeat 3 times.",
-        "icon": Icons.air,
-        "color": Colors.blue,
-      },
-      {
-        "title": "Progressive Relaxation",
-        "description":
-            "Tense and then relax each muscle group, starting from your toes and moving up.",
-        "icon": Icons.spa,
-        "color": Colors.green,
-      },
-      {
-        "title": "5-4-3-2-1 Grounding",
-        "description":
-            "Notice 5 things you see, 4 things you feel, 3 things you hear, 2 things you smell, 1 thing you taste.",
-        "icon": Icons.nature,
-        "color": Colors.teal,
-      },
-      {
-        "title": "Quick Visualization",
-        "description":
-            "Close your eyes and imagine a peaceful place for 30 seconds. Notice the details.",
-        "icon": Icons.cloud,
-        "color": Colors.purple,
-      },
-    ];
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(
-              'Stress Relief Techniques',
-              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            content: Container(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Choose a quick technique:',
-                    style: GoogleFonts.fredoka(),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 15),
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: reliefOptions.length,
-                      itemBuilder: (context, index) {
-                        final option = reliefOptions[index];
-                        return ListTile(
-                          leading: Icon(
-                            option["icon"] as IconData,
-                            color: option["color"] as Color,
-                          ),
-                          title: Text(
-                            option["title"] as String,
-                            style: GoogleFonts.fredoka(
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          subtitle: Text(
-                            option["description"] as String,
-                            style: GoogleFonts.fredoka(fontSize: 12),
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _addAchievement(
-                              "Used ${option["title"]} technique",
-                              icon: option["icon"] as IconData,
-                              color: option["color"] as Color,
-                            );
-
-                            // Show confirmation
-                            setState(() {
-                              _currentResponse =
-                                  "Great job using the ${option["title"]} technique! How do you feel now?";
-                            });
-
-                            // Clear message after delay
-                            Future.delayed(const Duration(seconds: 10), () {
-                              if (mounted &&
-                                  _currentResponse?.contains(
-                                        option["title"] as String,
-                                      ) ==
-                                      true) {
-                                setState(() {
-                                  _currentResponse = null;
-                                });
-                              }
-                            });
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Maybe Later', style: GoogleFonts.fredoka()),
-              ),
-            ],
-          ),
-    );
-  }
-
-  // Add this method for self-esteem building
-  void _showSelfEsteemBuilder() {
-    final prompts = [
-      "What's one small thing you like about yourself?",
-      "What's something you did well recently, no matter how small?",
-      "What's a challenge you've overcome in the past?",
-      "What's a quality your friends might appreciate about you?",
-      "What's a small act of kindness you've done recently?",
-    ];
-
-    final prompt = prompts[_random.nextInt(prompts.length)];
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(
-              'Positive Reflection',
-              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  prompt,
-                  style: GoogleFonts.fredoka(),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 15),
-                TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Your thoughts...',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                  textAlign: TextAlign.center,
-                  onSubmitted: (value) {
-                    if (value.isNotEmpty) {
-                      Navigator.pop(context);
-                      _addAchievement(
-                        "Completed a positive reflection",
-                        icon: Icons.favorite,
-                        color: Colors.red,
-                        points: 10,
-                      );
-
-                      // Pet responds with encouragement
-                      setState(() {
-                        _currentResponse =
-                            "That's wonderful! Thank you for sharing that with me. You should be proud of yourself!";
-                      });
-
-                      // Clear message after delay
-                      Future.delayed(const Duration(seconds: 10), () {
-                        if (mounted &&
-                            _currentResponse?.contains("That's wonderful") ==
-                                true) {
-                          setState(() {
-                            _currentResponse = null;
-                          });
-                        }
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Recognizing your positive qualities builds self-esteem!',
-                  style: GoogleFonts.fredoka(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Maybe Later', style: GoogleFonts.fredoka()),
-              ),
-            ],
-          ),
-    );
-  }
-
   Widget _buildFeatureButton({
     required VoidCallback onPressed,
     required IconData icon,
@@ -2482,6 +2057,7 @@ Pick one:
   }
 
   void _recordMood(String mood) {
+    print('DEBUG: _recordMood called with mood: $mood');
     setState(() {
       // Save the current mood for pet interaction and gemini context
       _currentMood = mood;
@@ -2503,11 +2079,25 @@ Pick one:
     });
     
     // Record the emotion using our EmotionService
-    _emotionService.recordEmotion(mood).then((_) {
-      print('Emotion recorded successfully: $mood');
-    }).catchError((error) {
-      print('Error recording emotion: $error');
-    });
+    try {
+      _emotionService.recordEmotion(mood).then((_) {
+        print('DEBUG: Emotion recorded successfully in _recordMood: $mood');
+        
+        // Verify the data was saved by immediately trying to fetch it
+        _emotionService.getEmotions(days: 1).then((emotions) {
+          print('DEBUG: Verification - Found ${emotions.length} emotions after recording');
+          if (emotions.isNotEmpty) {
+            print('DEBUG: Verification - Latest emotion: ${emotions.first}');
+          } else {
+            print('DEBUG: Verification - No emotions found immediately after recording');
+          }
+        });
+      }).catchError((error) {
+        print('Error recording emotion: $error');
+      });
+    } catch (e) {
+      print('DEBUG: Error in _recordMood: $e');
+    }
     
     // Send mood to Gemini service for contextual awareness in future interactions
     _geminiService.getCheckInResponse(mood).then((response) {

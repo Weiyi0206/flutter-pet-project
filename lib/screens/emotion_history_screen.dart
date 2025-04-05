@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'dart:math';
 import '../services/attendance_service.dart';
 import '../services/emotion_service.dart';
 
@@ -27,6 +28,7 @@ class _EmotionHistoryScreenState extends State<EmotionHistoryScreen> {
   void initState() {
     super.initState();
     _loadEmotionHistory();
+    _verifyFirebaseSetup();
   }
 
   Future<void> _loadEmotionHistory() async {
@@ -50,17 +52,43 @@ class _EmotionHistoryScreenState extends State<EmotionHistoryScreen> {
         default:
           daysToLoad = 7;
       }
+      
+      print('DEBUG: EmotionHistoryScreen loading emotions for $daysToLoad days');
 
       // Load emotion data using EmotionService
       final emotions = await _emotionService.getEmotions(days: daysToLoad);
       
+      print('DEBUG: EmotionHistoryScreen received ${emotions.length} emotion records');
+      
+      if (emotions.isEmpty) {
+        print('DEBUG: No emotion data returned from EmotionService');
+      } else {
+        // Print the first few emotions for debugging
+        for (int i = 0; i < min(3, emotions.length); i++) {
+          print('DEBUG: Sample emotion data: ${emotions[i]}');
+        }
+      }
+      
       // Convert to EmotionData objects
       final emotionData = emotions.map((data) {
-        return EmotionData(
-          date: DateTime.parse('${data['date']} ${data['time']}'),
-          emotion: data['emotion'],
-        );
+        try {
+          final dateTimeStr = '${data['date']} ${data['time']}';
+          print('DEBUG: Parsing datetime: $dateTimeStr');
+          return EmotionData(
+            date: DateTime.parse(dateTimeStr),
+            emotion: data['emotion'],
+          );
+        } catch (e) {
+          print('DEBUG: Error parsing emotion data: $e');
+          // Fallback to current date if parsing fails
+          return EmotionData(
+            date: DateTime.now(),
+            emotion: data['emotion'] ?? 'Unknown',
+          );
+        }
       }).toList();
+      
+      print('DEBUG: Created ${emotionData.length} EmotionData objects');
 
       setState(() {
         _emotionHistory = emotionData;
@@ -74,12 +102,73 @@ class _EmotionHistoryScreenState extends State<EmotionHistoryScreen> {
     }
   }
 
+  // Method to verify Firebase setup and data
+  Future<void> _verifyFirebaseSetup() async {
+    // Check authentication
+    final user = _auth.currentUser;
+    if (user == null) {
+      print('DEBUG: User is not authenticated!');
+      return;
+    }
+    
+    print('DEBUG: User is authenticated with ID: ${user.uid}');
+    
+    try {
+      // Check emotions collection
+      final emotionsSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('emotions')
+          .limit(5)
+          .get();
+          
+      print('DEBUG: Found ${emotionsSnapshot.docs.length} documents in emotions collection');
+      
+      // Check attendance collection
+      final attendanceSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('attendance')
+          .limit(5)
+          .get();
+          
+      print('DEBUG: Found ${attendanceSnapshot.docs.length} documents in attendance collection');
+      
+      // Print some sample data if available
+      if (emotionsSnapshot.docs.isNotEmpty) {
+        print('DEBUG: Sample emotion document: ${emotionsSnapshot.docs.first.data()}');
+      }
+      
+      if (attendanceSnapshot.docs.isNotEmpty) {
+        print('DEBUG: Sample attendance document: ${attendanceSnapshot.docs.first.data()}');
+      }
+    } catch (e) {
+      print('DEBUG: Error verifying Firebase setup: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Emotion History', style: GoogleFonts.fredoka()),
         elevation: 4,
+        actions: [
+          // Test button to add a record
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Add Test Emotion',
+            onPressed: _addTestEmotion,
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Reload Data',
+            onPressed: () {
+              print('DEBUG: Manual reload requested');
+              _loadEmotionHistory();
+            },
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -127,12 +216,43 @@ class _EmotionHistoryScreenState extends State<EmotionHistoryScreen> {
   Widget _buildEmotionChart() {
     if (_emotionHistory.isEmpty) {
       return Center(
-        child: Text(
-          'No emotion data available for this period.',
-          style: GoogleFonts.fredoka(
-            color: Colors.grey.shade600,
-          ),
-          textAlign: TextAlign.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'No emotion data available for this period.',
+              style: GoogleFonts.fredoka(
+                color: Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              label: Text('Add Test Emotion', style: GoogleFonts.fredoka()),
+              onPressed: _addTestEmotion,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'If you\'ve recorded emotions but don\'t see them here, try adding a test emotion or restarting the app.',
+                style: GoogleFonts.fredoka(
+                  color: Colors.grey.shade600,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -320,6 +440,29 @@ class _EmotionHistoryScreenState extends State<EmotionHistoryScreen> {
         return Colors.purple.shade300;
       default:
         return Colors.grey.shade400; // Neutral
+    }
+  }
+
+  // Test method to add an emotion record
+  void _addTestEmotion() async {
+    print('DEBUG: Adding test emotion');
+    final emotions = ['Happy', 'Sad', 'Calm', 'Anxious', 'Angry', 'Neutral'];
+    final random = Random();
+    final testEmotion = emotions[random.nextInt(emotions.length)];
+    
+    try {
+      await _emotionService.recordEmotion(testEmotion, note: 'Test emotion');
+      print('DEBUG: Test emotion "$testEmotion" added successfully');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Test emotion "$testEmotion" added')),
+      );
+      // Reload data after adding
+      _loadEmotionHistory();
+    } catch (e) {
+      print('DEBUG: Error adding test emotion: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 }
