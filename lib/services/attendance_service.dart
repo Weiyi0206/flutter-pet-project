@@ -22,6 +22,7 @@ class AttendanceResult {
   final int streak;
   final AttendanceReward? reward;
   final String? mood;
+  final int totalCoins;
 
   AttendanceResult({
     required this.success,
@@ -29,6 +30,7 @@ class AttendanceResult {
     required this.streak,
     this.reward,
     this.mood,
+    required this.totalCoins,
   });
 }
 
@@ -40,9 +42,68 @@ class AttendanceService {
   static const String _lastCheckInKey = 'last_check_in';
   static const String _streakKey = 'attendance_streak';
   static const String _attendanceDatesKey = 'attendance_dates';
+  static const String _totalCoinsKey = 'total_happiness_coins';
 
   // Get the current user ID or return null if not logged in
   String? get _userId => _auth.currentUser?.uid;
+
+  // Get total happiness coins earned
+  Future<int> getTotalCoins() async {
+    if (_userId == null) return 0;
+
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('${_userId}_$_totalCoinsKey') ?? 0;
+  }
+
+  // Update total happiness coins
+  Future<void> _updateTotalCoins(int additionalCoins) async {
+    if (_userId == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final currentCoins = prefs.getInt('${_userId}_$_totalCoinsKey') ?? 0;
+    final newTotal = currentCoins + additionalCoins;
+
+    await prefs.setInt('${_userId}_$_totalCoinsKey', newTotal);
+
+    // Also update in Firestore for backup
+    try {
+      await _firestore.collection('users').doc(_userId).set({
+        'totalHappinessCoins': newTotal,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('Error updating coins in Firestore: $e');
+    }
+  }
+
+  // Get happiness coin history (coins earned per day)
+  Future<List<Map<String, dynamic>>> getCoinHistory() async {
+    if (_userId == null) return [];
+
+    try {
+      final snapshot =
+          await _firestore
+              .collection('users')
+              .doc(_userId)
+              .collection('attendance')
+              .orderBy('date', descending: true)
+              .limit(30) // Get last 30 days
+              .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'date': doc.id,
+          'coins': data['reward']?['happinessBoost'] ?? 0,
+          'mood': data['mood'] ?? 'Unknown',
+          'moodEmoji': data['moodEmoji'] ?? '😐',
+        };
+      }).toList();
+    } catch (e) {
+      print('Error fetching coin history: $e');
+      return [];
+    }
+  }
 
   // new added
   Future<bool> shouldShowCheckInPrompt() async {
@@ -75,6 +136,29 @@ class AttendanceService {
   }
 
   // Get all attendance dates for the calendar
+  Future<List<Map<String, dynamic>>> getAttendanceDatesWithMoods() async {
+    if (_userId == null) return [];
+
+    final prefs = await SharedPreferences.getInstance();
+    final dateStrings = prefs.getStringList(_attendanceDatesKey) ?? [];
+    final moodData = <Map<String, dynamic>>[];
+
+    // Get mood data for each date
+    for (final dateStr in dateStrings) {
+      final date = DateTime.parse(dateStr);
+      String? moodEmoji = prefs.getString('${_userId}_mood_$dateStr');
+
+      moodData.add({
+        'date': date,
+        'moodEmoji':
+            moodEmoji ?? '😊', // Default to happy if no mood was stored
+      });
+    }
+
+    return moodData;
+  }
+
+  // For backward compatibility, keep the original method
   Future<List<DateTime>> getAttendanceDates() async {
     if (_userId == null) return [];
 
@@ -86,6 +170,26 @@ class AttendanceService {
     }).toList();
   }
 
+  // Map mood name to emoji
+  String _getMoodEmoji(String mood) {
+    switch (mood) {
+      case 'Happy':
+        return '😊';
+      case 'Calm':
+        return '😌';
+      case 'Neutral':
+        return '😐';
+      case 'Sad':
+        return '😔';
+      case 'Angry':
+        return '😡';
+      case 'Anxious':
+        return '😰';
+      default:
+        return '😊';
+    }
+  }
+
   // Mark attendance for today
   Future<AttendanceResult> markAttendanceWithMood(String mood) async {
     if (_userId == null) {
@@ -93,16 +197,19 @@ class AttendanceService {
         success: false,
         message: 'You need to be logged in to check in',
         streak: 0,
+        totalCoins: 0,
       );
     }
 
     // Check if already checked in today
     if (await hasCheckedInToday()) {
       final streak = await getStreak();
+      final totalCoins = await getTotalCoins();
       return AttendanceResult(
         success: false,
         message: 'You have already checked in today',
         streak: streak,
+        totalCoins: totalCoins,
       );
     }
 
@@ -140,6 +247,10 @@ class AttendanceService {
     attendanceDates.add(today);
     await prefs.setStringList(_attendanceDatesKey, attendanceDates);
 
+    // Save the mood emoji for this date
+    final moodEmoji = _getMoodEmoji(mood);
+    await prefs.setString('${_userId}_mood_$today', moodEmoji);
+
     // Create reward based on streak
     AttendanceReward reward;
     if (currentStreak % 7 == 0) {
@@ -161,6 +272,17 @@ class AttendanceService {
       reward = AttendanceReward(name: 'Daily Pet Treat', happinessBoost: 10);
     }
 
+    // Add bonus coins for positive moods
+    int moodBonus = 0;
+    if (mood == 'Happy') moodBonus = 5;
+    if (mood == 'Calm') moodBonus = 3;
+
+    // Update total coins with reward + mood bonus
+    await _updateTotalCoins(reward.happinessBoost + moodBonus);
+
+    // Get updated total coins
+    final totalCoins = await getTotalCoins();
+
     // Save check-in to Firestore for backup
     try {
       await _firestore
@@ -172,10 +294,13 @@ class AttendanceService {
             'date': today,
             'streak': currentStreak,
             'mood': mood,
+            'moodEmoji': moodEmoji,
             'reward': {
               'name': reward.name,
               'happinessBoost': reward.happinessBoost,
             },
+            'moodBonus': moodBonus,
+            'totalCoinsEarned': reward.happinessBoost + moodBonus,
             'timestamp': FieldValue.serverTimestamp(),
           });
     } catch (e) {
@@ -192,6 +317,7 @@ class AttendanceService {
       streak: currentStreak,
       reward: reward,
       mood: mood,
+      totalCoins: totalCoins,
     );
   }
 }

@@ -13,15 +13,17 @@ class AttendanceScreen extends StatefulWidget {
 class _AttendanceScreenState extends State<AttendanceScreen>
     with SingleTickerProviderStateMixin {
   final AttendanceService _attendanceService = AttendanceService();
-  List<DateTime> _attendanceDates = [];
+  List<Map<String, dynamic>> _attendanceDatesWithMoods = [];
   DateTime? _selectedDate;
   bool _isLoading = true;
   int _streak = 0;
+  int _totalCoins = 0;
   bool _checkedInToday = false;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   AttendanceReward? _lastReward;
   bool _showRewardAnimation = false;
+  int _earnedCoins = 0;
 
   @override
   void initState() {
@@ -48,14 +50,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     });
 
     try {
-      final dates = await _attendanceService.getAttendanceDates();
+      final datesWithMoods =
+          await _attendanceService.getAttendanceDatesWithMoods();
       final streak = await _attendanceService.getStreak();
       final checkedIn = await _attendanceService.hasCheckedInToday();
+      final totalCoins = await _attendanceService.getTotalCoins();
 
       setState(() {
-        _attendanceDates = dates;
+        _attendanceDatesWithMoods = datesWithMoods;
         _streak = streak;
         _checkedInToday = checkedIn;
+        _totalCoins = totalCoins;
         _isLoading = false;
       });
     } catch (e) {
@@ -65,32 +70,42 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       });
     }
   }
+
   final moodOptions = [
-      {'emoji': '😊', 'label': 'Happy', 'color': Colors.yellow},
-      {'emoji': '😌', 'label': 'Calm', 'color': Colors.blue.shade300},
-      {'emoji': '😐', 'label': 'Neutral', 'color': Colors.grey.shade400},
-      {'emoji': '😔', 'label': 'Sad', 'color': Colors.indigo.shade300},
-      {'emoji': '😡', 'label': 'Angry', 'color': Colors.red.shade400},
-      {'emoji': '😰', 'label': 'Anxious', 'color': Colors.purple.shade300},
-    ];
+    {'emoji': '😊', 'label': 'Happy', 'color': Colors.yellow},
+    {'emoji': '😌', 'label': 'Calm', 'color': Colors.blue.shade300},
+    {'emoji': '😐', 'label': 'Neutral', 'color': Colors.grey.shade400},
+    {'emoji': '😔', 'label': 'Sad', 'color': Colors.indigo.shade300},
+    {'emoji': '😡', 'label': 'Angry', 'color': Colors.red.shade400},
+    {'emoji': '😰', 'label': 'Anxious', 'color': Colors.purple.shade300},
+  ];
 
   Future<void> _handleCheckIn() async {
-    final mood = moodOptions.first['label'] as String;
-    final result = await _attendanceService.markAttendanceWithMood(mood);
+    // Show mood selection dialog
+    final selectedMood = await _showMoodSelectionDialog();
+    if (selectedMood == null) return; // User cancelled
+
+    final result = await _attendanceService.markAttendanceWithMood(
+      selectedMood,
+    );
 
     if (result.success) {
+      // Calculate earned coins in this check-in
+      final int prevCoins = _totalCoins;
+      final int newCoins = result.totalCoins;
+      final int earned = newCoins - prevCoins;
+
       setState(() {
         _lastReward = result.reward;
         _showRewardAnimation = true;
         _streak = result.streak;
         _checkedInToday = true;
+        _totalCoins = result.totalCoins;
+        _earnedCoins = earned;
       });
 
-      // Add today to attendance dates
-      final today = DateTime.now();
-      setState(() {
-        _attendanceDates.add(DateTime(today.year, today.month, today.day));
-      });
+      // Reload data to get the updated mood data
+      _loadAttendanceData();
 
       // Play animation
       _animationController.reset();
@@ -109,6 +124,67 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         context,
       ).showSnackBar(SnackBar(content: Text(result.message)));
     }
+  }
+
+  // Show dialog to select mood
+  Future<String?> _showMoodSelectionDialog() async {
+    return showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text(
+              'How are you feeling today?',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Select your mood:'),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    alignment: WrapAlignment.center,
+                    children:
+                        moodOptions.map((option) {
+                          return InkWell(
+                            onTap:
+                                () => Navigator.of(
+                                  context,
+                                ).pop(option['label'] as String),
+                            child: Column(
+                              children: [
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: (option['color'] as Color)
+                                        .withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  padding: const EdgeInsets.all(10),
+                                  child: Text(
+                                    option['emoji'] as String,
+                                    style: const TextStyle(fontSize: 30),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(option['label'] as String),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+    );
   }
 
   void _onDateSelected(DateTime date) {
@@ -132,6 +208,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          _buildCoinCounter(),
+                          const SizedBox(height: 16),
                           _buildStreakInfo(),
                           const SizedBox(height: 16),
                           Card(
@@ -149,7 +227,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                   ),
                                   const SizedBox(height: 16),
                                   AttendanceCalendar(
-                                    markedDates: _attendanceDates,
+                                    markedDatesWithMoods:
+                                        _attendanceDatesWithMoods,
                                     selectedDate: _selectedDate,
                                     onDaySelected: _onDateSelected,
                                   ),
@@ -168,6 +247,121 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   if (_showRewardAnimation) _buildRewardAnimation(),
                 ],
               ),
+    );
+  }
+
+  Widget _buildCoinCounter() {
+    return Card(
+      color: Colors.amber.shade300,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.monetization_on,
+                  color: Colors.amber.shade800,
+                  size: 32,
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Happiness Coins',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      '$_totalCoins coins',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.info_outline, color: Colors.black54),
+              onPressed: () {
+                _showCoinInfoDialog();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCoinInfoDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.monetization_on, color: Colors.amber.shade600),
+                const SizedBox(width: 8),
+                const Text('Happiness Coins'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Happiness Coins are earned through daily check-ins:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                _buildCoinInfoItem('Daily Check-in', '+10 coins'),
+                _buildCoinInfoItem('Happy Mood Bonus', '+5 coins'),
+                _buildCoinInfoItem('Calm Mood Bonus', '+3 coins'),
+                _buildCoinInfoItem('Weekly Streak (7 days)', '+20 coins'),
+                _buildCoinInfoItem('Monthly Streak (30 days)', '+50 coins'),
+                const SizedBox(height: 12),
+                const Text(
+                  'These coins reflect your pet\'s happiness level and can be used to unlock special features in the future!',
+                  style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Got it'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildCoinInfoItem(String title, String reward) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title),
+          Text(
+            reward,
+            style: TextStyle(
+              color: Colors.amber.shade800,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -366,8 +560,24 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 ),
               ),
               const SizedBox(height: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.monetization_on, color: Colors.amber.shade600),
+                  const SizedBox(width: 4),
+                  Text(
+                    '+$_earnedCoins coins',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.amber.shade800,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
               Text(
-                '+${_lastReward!.happinessBoost} Happiness',
+                '+${_lastReward!.happinessBoost} happiness',
                 style: const TextStyle(
                   fontSize: 16,
                   color: Colors.green,
