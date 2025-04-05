@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/practice_tip.dart';
 import 'tip_detail_screen.dart';
 
@@ -30,10 +31,10 @@ class CategoryTipsScreen extends StatelessWidget {
         centerTitle: true,
         title: Text(
           categoryName,
-          style: const TextStyle(
+          style: GoogleFonts.fredoka(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF6A9BF5),
+            color: const Color(0xFF6A9BF5),
           ),
         ),
         backgroundColor: Colors.white,
@@ -49,14 +50,17 @@ class CategoryTipsScreen extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       'No tips available for this category',
-                      style: TextStyle(fontSize: 16),
+                      style: GoogleFonts.fredoka(fontSize: 16),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Category: $categoryName',
-                      style: const TextStyle(color: Colors.grey, fontSize: 14),
+                      style: GoogleFonts.fredoka(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
@@ -95,7 +99,7 @@ class CategoryTipsScreen extends StatelessWidget {
                       ),
                       title: Text(
                         tip.title,
-                        style: const TextStyle(
+                        style: GoogleFonts.fredoka(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -104,7 +108,10 @@ class CategoryTipsScreen extends StatelessWidget {
                         tip.benefit,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        style: GoogleFonts.fredoka(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
                       ),
                       children: [
                         InkWell(
@@ -123,7 +130,7 @@ class CategoryTipsScreen extends StatelessWidget {
                               children: [
                                 Text(
                                   tip.description,
-                                  style: TextStyle(
+                                  style: GoogleFonts.fredoka(
                                     fontSize: 14,
                                     color: Colors.grey[800],
                                     height: 1.5,
@@ -152,7 +159,10 @@ class CategoryTipsScreen extends StatelessWidget {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
-                                  child: const Text('View Details'),
+                                  child: Text(
+                                    'View Details',
+                                    style: GoogleFonts.fredoka(),
+                                  ),
                                 ),
                               ],
                             ),

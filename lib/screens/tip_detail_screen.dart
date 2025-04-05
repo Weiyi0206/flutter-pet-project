@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/practice_tip.dart';
 
 class TipDetailScreen extends StatelessWidget {
@@ -11,29 +12,23 @@ class TipDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        centerTitle: true, // Center the title
+        centerTitle: true,
         title: Text(
           tip.title,
-          style: const TextStyle(
-            fontSize: 18, // Control title text size
-            fontWeight: FontWeight.normal,
-            color: Color.fromARGB(
-              255,
-              0,
-              0,
-              0,
-            ), // Match your app's color scheme
+          style: GoogleFonts.fredoka(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF6A9BF5),
           ),
         ),
         backgroundColor: Colors.white,
-        elevation: 0, // Remove shadow
-        toolbarHeight: 60, // Control AppBar height (default is 56)
-        leadingWidth: 56, // Control back button area width
+        elevation: 0,
+        leadingWidth: 56,
         leading: IconButton(
           icon: const Icon(
             Icons.arrow_back_ios,
             color: Color(0xFF6A9BF5),
-            size: 20, // Control back arrow size
+            size: 20,
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
@@ -43,13 +38,10 @@ class TipDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image at the top
             if (tip.imageUrl.isNotEmpty) ...[
               SizedBox(
                 width: double.infinity,
-                height:
-                    MediaQuery.of(context).size.height *
-                    0.4, // 40% of screen height
+                height: MediaQuery.of(context).size.height * 0.4,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image.network(
@@ -75,7 +67,7 @@ class TipDetailScreen extends StatelessWidget {
                       );
                     },
                     errorBuilder: (context, error, stackTrace) {
-                      print('Error loading image: $error'); // Debug print
+                      print('Error loading image: $error');
                       return Container(
                         decoration: BoxDecoration(
                           color: Colors.grey[200],
@@ -108,14 +100,13 @@ class TipDetailScreen extends StatelessWidget {
             ],
             Text(
               tip.description,
-              style: TextStyle(
+              style: GoogleFonts.fredoka(
                 fontSize: 16,
                 color: Colors.grey[800],
                 height: 1.5,
               ),
             ),
             const SizedBox(height: 24),
-            // Only show place if it's not empty
             if (tip.place.isNotEmpty) ...[
               _buildInfoSection('Place', tip.place),
               const SizedBox(height: 16),
@@ -124,12 +115,12 @@ class TipDetailScreen extends StatelessWidget {
             const SizedBox(height: 16),
             if (tip.steps.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Steps:',
-                style: TextStyle(
+                style: GoogleFonts.fredoka(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF6A9BF5),
+                  color: const Color(0xFF6A9BF5),
                 ),
               ),
               const SizedBox(height: 12),
@@ -150,7 +141,7 @@ class TipDetailScreen extends StatelessWidget {
                         child: Center(
                           child: Text(
                             '${entry.key + 1}',
-                            style: const TextStyle(
+                            style: GoogleFonts.fredoka(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
@@ -160,7 +151,7 @@ class TipDetailScreen extends StatelessWidget {
                       Expanded(
                         child: Text(
                           entry.value,
-                          style: const TextStyle(fontSize: 16),
+                          style: GoogleFonts.fredoka(fontSize: 16),
                         ),
                       ),
                     ],
@@ -211,7 +202,7 @@ class TipDetailScreen extends StatelessWidget {
                     ),
                   ),
                   icon: const Icon(Icons.article_outlined),
-                  label: const Text('Read Article'),
+                  label: Text('Read Article', style: GoogleFonts.fredoka()),
                 ),
               ),
             ],
@@ -258,7 +249,7 @@ class TipDetailScreen extends StatelessWidget {
                     ),
                   ),
                   icon: const Icon(Icons.play_circle_outline),
-                  label: const Text('Watch Tutorial'),
+                  label: Text('Watch Tutorial', style: GoogleFonts.fredoka()),
                 ),
               ),
             ],
@@ -276,14 +267,14 @@ class TipDetailScreen extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: GoogleFonts.fredoka(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF6A9BF5),
+              color: const Color(0xFF6A9BF5),
             ),
           ),
           const SizedBox(height: 8),
-          Text(content, style: const TextStyle(fontSize: 16)),
+          Text(content, style: GoogleFonts.fredoka(fontSize: 16)),
         ],
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/tips_service.dart';
 import 'category_tips_screen.dart';
 
@@ -43,12 +44,17 @@ class _DailyTipsScreenState extends State<DailyTipsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Daily Practice Tips',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
+          style: GoogleFonts.fredoka(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF6A9BF5),
+          ),
         ),
         centerTitle: true,
-        backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+        backgroundColor: Colors.white,
+        elevation: 0,
       ),
       body: Padding(
         padding: const EdgeInsets.all(12),
@@ -87,7 +93,6 @@ class _DailyTipsScreenState extends State<DailyTipsScreen> {
                 color: Colors.white,
                 child: Stack(
                   children: [
-                    // Center the main content
                     Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -106,10 +111,10 @@ class _DailyTipsScreenState extends State<DailyTipsScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             child: Text(
                               categoryName,
-                              style: const TextStyle(
+                              style: GoogleFonts.fredoka(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF333333),
+                                color: const Color(0xFF333333),
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -117,7 +122,6 @@ class _DailyTipsScreenState extends State<DailyTipsScreen> {
                         ],
                       ),
                     ),
-                    // Keep the info button in the corner
                     Positioned(
                       top: 8,
                       right: 8,
@@ -134,24 +138,29 @@ class _DailyTipsScreenState extends State<DailyTipsScreen> {
                               return AlertDialog(
                                 title: Text(
                                   categoryName,
-                                  style: const TextStyle(
+                                  style: GoogleFonts.fredoka(
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF6A9BF5),
+                                    color: const Color(0xFF6A9BF5),
                                   ),
                                 ),
                                 content: Text(
                                   category['description'] as String,
-                                  style: const TextStyle(
+                                  style: GoogleFonts.fredoka(
                                     fontSize: 16,
-                                    color: Color(0xFF333333),
+                                    color: const Color(0xFF333333),
                                   ),
                                 ),
                                 actions: [
                                   TextButton(
                                     onPressed:
                                         () => Navigator.of(context).pop(),
-                                    child: const Text('Close'),
+                                    child: Text(
+                                      'Close',
+                                      style: GoogleFonts.fredoka(
+                                        color: const Color(0xFF6A9BF5),
+                                      ),
+                                    ),
                                   ),
                                 ],
                               );
