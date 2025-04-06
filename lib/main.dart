@@ -230,6 +230,7 @@ Pick one:
   List<Map<String, dynamic>> _achievements = [];
   bool _hasCompletedActivityToday = false;
   int _achievementPoints = 0;
+  int _totalHappinessCoins = 0; // Add this line to track happiness coins
 
   bool _isVisualizationActive = false;
 
@@ -272,6 +273,9 @@ Pick one:
         _showMoodTracker(); // This uses your existing mood tracker dialog
       }
     }
+
+    // Load happiness coins
+    _loadHappinessCoins();
 
     // Show check-in prompt after widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -791,6 +795,9 @@ Pick one:
       _currentResponse = "Achievement unlocked: $title (+$points points)! 🎉";
     });
 
+    // Update happiness coins from achievements
+    _updateAchievementCoins(points);
+
     // Clear message after delay
     Future.delayed(const Duration(seconds: 8), () {
       if (mounted &&
@@ -800,6 +807,18 @@ Pick one:
         });
       }
     });
+  }
+
+  // Update happiness coins from achievements
+  Future<void> _updateAchievementCoins(int points) async {
+    final attendanceService = AttendanceService();
+
+    // First refresh the current coin count
+    await _loadHappinessCoins();
+
+    // We don't actually need to update coins here since achievements
+    // don't directly add to the happiness coins, but we refresh the display
+    // in case other activities have affected the coins
   }
 
   void _showSmallActivityPrompt() {
@@ -1453,6 +1472,54 @@ Pick one:
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                // Happiness Coins Counter
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    margin: const EdgeInsets.only(
+                                      bottom: 10,
+                                      left: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade100,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: Colors.amber.shade300,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.monetization_on,
+                                          color: Colors.amber,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          '$_totalHappinessCoins',
+                                          style: GoogleFonts.fredoka(
+                                            color: Colors.amber.shade800,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          'Coins',
+                                          style: GoogleFonts.fredoka(
+                                            color: Colors.amber.shade800,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                                 // Top row of feature buttons
                                 Row(
                                   mainAxisAlignment:
@@ -2568,6 +2635,9 @@ Pick one:
                                   },
                                 );
                               }
+
+                              // Update happiness coins count
+                              _loadHappinessCoins();
                             }
                           },
                           // onTap:
@@ -2893,6 +2963,17 @@ Pick one:
   void _processChatMessage(String message) {
     // Pass an empty mood since this is from chat, not check-in
     _checkUserDistress(message, '');
+  }
+
+  // Load happiness coins from AttendanceService
+  Future<void> _loadHappinessCoins() async {
+    final attendanceService = AttendanceService();
+    final coins = await attendanceService.getTotalCoins();
+    if (mounted) {
+      setState(() {
+        _totalHappinessCoins = coins;
+      });
+    }
   }
 }
 

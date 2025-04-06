@@ -133,15 +133,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text(
+            title: Text(
               'How are you feeling today?',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
             ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Select your mood:'),
+                  Text('Select your mood:', style: GoogleFonts.fredoka()),
                   const SizedBox(height: 16),
                   Wrap(
                     spacing: 12,
@@ -169,7 +169,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(option['label'] as String),
+                                Text(
+                                  option['label'] as String,
+                                  style: GoogleFonts.fredoka(),
+                                ),
                               ],
                             ),
                           );
@@ -181,7 +184,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('Cancel', style: GoogleFonts.fredoka()),
               ),
             ],
           ),
@@ -224,9 +227,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               padding: const EdgeInsets.all(16.0),
                               child: Column(
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Attendance Calendar',
-                                    style: TextStyle(
+                                    style: GoogleFonts.fredoka(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -277,9 +280,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Happiness Coins',
-                      style: TextStyle(
+                      style: GoogleFonts.fredoka(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
@@ -287,7 +290,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     ),
                     Text(
                       '$_totalCoins coins',
-                      style: TextStyle(
+                      style: GoogleFonts.fredoka(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Colors.amber.shade900,
@@ -318,34 +321,35 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               children: [
                 Icon(Icons.monetization_on, color: Colors.amber.shade600),
                 const SizedBox(width: 8),
-                const Text('Happiness Coins'),
+                Text('Happiness Coins', style: GoogleFonts.fredoka()),
               ],
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Happiness Coins are earned through daily check-ins:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 _buildCoinInfoItem('Daily Check-in', '+10 coins'),
-                _buildCoinInfoItem('Happy Mood Bonus', '+5 coins'),
-                _buildCoinInfoItem('Calm Mood Bonus', '+3 coins'),
                 _buildCoinInfoItem('Weekly Streak (7 days)', '+20 coins'),
                 _buildCoinInfoItem('Monthly Streak (30 days)', '+50 coins'),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'These coins reflect your pet\'s happiness level and can be used to unlock special features in the future!',
-                  style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                  style: GoogleFonts.fredoka(
+                    fontStyle: FontStyle.italic,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Got it'),
+                child: Text('Got it', style: GoogleFonts.fredoka()),
               ),
             ],
           ),
@@ -358,10 +362,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title),
+          Text(title, style: GoogleFonts.fredoka()),
           Text(
             reward,
-            style: TextStyle(
+            style: GoogleFonts.fredoka(
               color: Colors.amber.shade800,
               fontWeight: FontWeight.bold,
             ),
@@ -390,9 +394,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 const SizedBox(width: 8),
                 Text(
                   'Current Streak',
-                  style: theme.textTheme.titleLarge?.copyWith(
+                  style: GoogleFonts.fredoka(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
+                    fontSize: theme.textTheme.titleLarge?.fontSize,
                   ),
                 ),
               ],
@@ -400,9 +405,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             const SizedBox(height: 8),
             Text(
               '$_streak days',
-              style: theme.textTheme.headlineMedium?.copyWith(
+              style: GoogleFonts.fredoka(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
+                fontSize: theme.textTheme.headlineMedium?.fontSize,
               ),
             ),
             if (_streak > 0)
@@ -414,8 +420,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       : _streak >= 7
                       ? 'Amazing dedication!'
                       : 'Great job!',
-                  style: theme.textTheme.bodyLarge?.copyWith(
+                  style: GoogleFonts.fredoka(
                     color: Colors.white,
+                    fontSize: theme.textTheme.bodyLarge?.fontSize,
                   ),
                 ),
               ),
@@ -431,7 +438,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       icon: Icon(_checkedInToday ? Icons.check_circle : Icons.pets),
       label: Text(
         _checkedInToday ? 'Already Checked In Today' : 'Check In Now',
-        style: const TextStyle(fontSize: 16),
+        style: GoogleFonts.fredoka(fontSize: 16),
       ),
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -448,9 +455,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Attendance Rewards',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: GoogleFonts.fredoka(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 16),
             _buildRewardItem(
@@ -504,12 +514,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: GoogleFonts.fredoka(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
                 ),
-                Text(description, style: TextStyle(color: Colors.grey[600])),
+                Text(
+                  description,
+                  style: GoogleFonts.fredoka(color: Colors.grey[600]),
+                ),
               ],
             ),
           ),
@@ -553,14 +566,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Reward Earned!',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style: GoogleFonts.fredoka(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 _lastReward!.name,
-                style: const TextStyle(
+                style: GoogleFonts.fredoka(
                   fontSize: 18,
                   fontWeight: FontWeight.w500,
                 ),
@@ -573,7 +589,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   const SizedBox(width: 4),
                   Text(
                     '+$_earnedCoins coins',
-                    style: TextStyle(
+                    style: GoogleFonts.fredoka(
                       fontSize: 18,
                       color: Colors.amber.shade800,
                       fontWeight: FontWeight.bold,
@@ -584,7 +600,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               const SizedBox(height: 4),
               Text(
                 '+${_lastReward!.happinessBoost} happiness',
-                style: const TextStyle(
+                style: GoogleFonts.fredoka(
                   fontSize: 16,
                   color: Colors.green,
                   fontWeight: FontWeight.bold,

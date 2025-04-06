@@ -272,12 +272,11 @@ class AttendanceService {
       reward = AttendanceReward(name: 'Daily Pet Treat', happinessBoost: 10);
     }
 
-    // Add bonus coins for positive moods
+    // No mood bonuses - all moods get the same reward
     int moodBonus = 0;
-    if (mood == 'Happy') moodBonus = 5;
-    if (mood == 'Calm') moodBonus = 3;
+    // Removed mood-specific bonuses
 
-    // Update total coins with reward + mood bonus
+    // Update total coins with reward only (no mood bonus)
     await _updateTotalCoins(reward.happinessBoost + moodBonus);
 
     // Get updated total coins
@@ -299,8 +298,11 @@ class AttendanceService {
               'name': reward.name,
               'happinessBoost': reward.happinessBoost,
             },
-            'moodBonus': moodBonus,
-            'totalCoinsEarned': reward.happinessBoost + moodBonus,
+            'moodBonus':
+                moodBonus, // Kept for backward compatibility, always 0 now
+            'totalCoinsEarned':
+                reward.happinessBoost +
+                moodBonus, // Equal to happinessBoost now
             'timestamp': FieldValue.serverTimestamp(),
           });
     } catch (e) {
