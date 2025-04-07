@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/tips_service.dart';
 import 'category_tips_screen.dart';
+import '../models/pet_model.dart';
 
 class DailyTipsScreen extends StatefulWidget {
   const DailyTipsScreen({super.key});
@@ -12,6 +13,20 @@ class DailyTipsScreen extends StatefulWidget {
 
 class _DailyTipsScreenState extends State<DailyTipsScreen> {
   final TipsService _tipsService = TipsService();
+
+  @override
+  void initState() {
+    super.initState();
+    _markTipViewedTask();
+  }
+
+  Future<void> _markTipViewedTask() async {
+    try {
+      await PetModel().markTipViewed();
+    } catch (e) {
+      print("Error marking tip viewed task: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

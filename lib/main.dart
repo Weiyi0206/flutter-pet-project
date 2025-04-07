@@ -201,6 +201,39 @@ class _MyHomePageState extends State<MyHomePage> {
       currentCountKey: 'groomsToday', // Assumes PetModel tracks this
       coinReward: 1,
     ),
+    PetTask(
+      id: 'chat_5_times',
+      name: 'Friendly Chat',
+      description: 'Send 5 messages to your pet today',
+      icon: Icons.chat_bubble_outline,
+      color: Colors.pink,
+      requiredCount: 5,
+      // Requires PetModel to track 'chatsToday' - increment in _sendMessage
+      currentCountKey: 'chatsToday',
+      coinReward: 3,
+    ),
+    PetTask(
+      id: 'write_diary_entry',
+      name: 'Dear Diary',
+      description: 'Write at least one diary entry today',
+      icon: Icons.book_outlined,
+      color: Colors.teal,
+      requiredCount: 1,
+      // Requires PetModel to track 'diaryEntriesToday' - update from DiaryScreen
+      currentCountKey: 'diaryEntriesToday',
+      coinReward: 2,
+    ),
+    PetTask(
+      id: 'view_daily_tip',
+      name: 'Daily Wisdom',
+      description: 'Check out the daily tips screen',
+      icon: Icons.lightbulb_outline,
+      color: Colors.amber,
+      requiredCount: 1,
+      // Requires PetModel to track 'viewedTipsToday' - update from DailyTipsScreen
+      currentCountKey: 'viewedTipsToday',
+      coinReward: 1,
+    ),
   ];
 
   // --- Added Completed Tasks Count ---
@@ -583,6 +616,11 @@ class _MyHomePageState extends State<MyHomePage> {
     try {
        await _petModel.saveChatMessage(messageDataForSave); // Pass map with Timestamp.fromDate()
        print("User message saved to Firestore.");
+
+       // --- ADDED: Increment chat count task ---
+       await _petModel.incrementChatCount();
+       // --- END ADDED ---
+
     } catch (e) {
        print("Error saving user message: $e");
        // Optionally revert UI update or show error

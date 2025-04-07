@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/diary_entry.dart';
 import 'package:uuid/uuid.dart';
+import '../models/pet_model.dart';
 
 class DiaryService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -79,6 +80,8 @@ class DiaryService {
           .collection('entries')
           .doc(entryId)
           .set(entry.toMap());
+
+      await PetModel().incrementDiaryEntryCount();
 
       return entry;
     } catch (e) {

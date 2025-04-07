@@ -73,15 +73,14 @@ class _PetTasksScreenState extends State<PetTasksScreen> {
       currentCountKey: 'mealsToday',
       coinReward: 1,
     ),
-    // Add more tasks here (e.g., play, groom, etc.)
     PetTask(
       id: 'play_2_times',
       name: 'Play Session',
       description: 'Play with your pet 2 times',
       icon: Icons.sports_esports,
       color: Colors.blue,
-      requiredCount: 2, // Needs PetModel to track 'playsToday'
-      currentCountKey: 'playsToday', // <<< IMPORTANT: PetModel needs to track this!
+      requiredCount: 2,
+      currentCountKey: 'playsToday',
       coinReward: 2,
     ),
     PetTask(
@@ -90,8 +89,38 @@ class _PetTasksScreenState extends State<PetTasksScreen> {
       description: 'Groom your pet once',
       icon: Icons.cleaning_services,
       color: Colors.green,
-      requiredCount: 1, // Needs PetModel to track 'groomsToday'
-      currentCountKey: 'groomsToday', // <<< IMPORTANT: PetModel needs to track this!
+      requiredCount: 1,
+      currentCountKey: 'groomsToday',
+      coinReward: 1,
+    ),
+    PetTask(
+      id: 'chat_5_times',
+      name: 'Friendly Chat',
+      description: 'Send 5 messages to your pet today',
+      icon: Icons.chat_bubble_outline,
+      color: Colors.pink,
+      requiredCount: 5,
+      currentCountKey: 'chatsToday',
+      coinReward: 3,
+    ),
+    PetTask(
+      id: 'write_diary_entry',
+      name: 'Dear Diary',
+      description: 'Write at least one diary entry today',
+      icon: Icons.book_outlined,
+      color: Colors.teal,
+      requiredCount: 1,
+      currentCountKey: 'diaryEntriesToday',
+      coinReward: 2,
+    ),
+    PetTask(
+      id: 'view_daily_tip',
+      name: 'Daily Wisdom',
+      description: 'Check out the daily tips screen',
+      icon: Icons.lightbulb_outline,
+      color: Colors.amber,
+      requiredCount: 1,
+      currentCountKey: 'viewedTipsToday',
       coinReward: 1,
     ),
   ];
@@ -123,6 +152,8 @@ class _PetTasksScreenState extends State<PetTasksScreen> {
         print("[PetTasksScreen] Coin refresh callback triggered.");
 
         if (mounted) {
+          _petData = await widget.petModel.loadPetData();
+          _taskStatus = Map<String, bool>.from(_petData['dailyTaskStatus'] ?? {});
           setState(() {});
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -147,16 +178,15 @@ class _PetTasksScreenState extends State<PetTasksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _petData = widget.petData;
     _taskStatus = Map<String, bool>.from(_petData['dailyTaskStatus'] ?? {});
 
     int completedTasks = 0;
-    _tasks.forEach((task) {
+    for (var task in _tasks) {
       int currentCount = _petData[task.currentCountKey] as int? ?? 0;
       if (currentCount >= task.requiredCount) {
         completedTasks++;
       }
-    });
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -194,7 +224,7 @@ class _PetTasksScreenState extends State<PetTasksScreen> {
                 Text(
                   'Tasks to Complete',
                   style: GoogleFonts.fredoka(
-                    fontSize: 24,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Colors.purple.shade800,
                   ),
@@ -254,6 +284,7 @@ class _PetTasksScreenState extends State<PetTasksScreen> {
                 style: GoogleFonts.fredoka(
                   fontSize: 16,
                   color: Colors.green.shade800,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -264,102 +295,123 @@ class _PetTasksScreenState extends State<PetTasksScreen> {
   }
 
   Widget _buildTaskList() {
-    return ListView.separated(
-      itemCount: _tasks.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final task = _tasks[index];
-        final int currentCount = _petData[task.currentCountKey] as int? ?? 0;
-        final bool isCompleted = currentCount >= task.requiredCount;
-        final bool isClaimed = _taskStatus[task.id] ?? false;
+    return Scrollbar(
+      thumbVisibility: true,
+      child: ListView.separated(
+        itemCount: _tasks.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final task = _tasks[index];
+          final int currentCount = _petData[task.currentCountKey] as int? ?? 0;
+          final bool isCompleted = currentCount >= task.requiredCount;
+          final bool isClaimed = _taskStatus[task.id] ?? false;
 
-        final String progressText = '${task.currentCountKey.contains("Today") ? currentCount : "?"}/${task.requiredCount}';
+          final String progressText = _petData.containsKey(task.currentCountKey)
+              ? '$currentCount/${task.requiredCount}'
+              : '0/${task.requiredCount} (Tracking Needed)';
 
-        return Opacity(
-          opacity: isClaimed ? 0.6 : 1.0,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(12),
-              leading: CircleAvatar(
-                backgroundColor: task.color.withOpacity(0.2),
-                child: Icon(task.icon, color: task.color),
-              ),
-              title: Text(
-                task.name,
-                style: GoogleFonts.fredoka(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade800,
-                ),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  Text(
-                    task.description,
-                    style: GoogleFonts.fredoka(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Progress: $progressText',
-                    style: GoogleFonts.fredoka(
-                      fontSize: 12,
-                      color: isCompleted ? Colors.green.shade700 : Colors.orange.shade700,
-                      fontWeight: FontWeight.w500
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.shade200),
-                    ),
-                    child: Text(
-                      'Reward: ${task.coinReward} Coins',
-                      style: GoogleFonts.fredoka(
-                        fontSize: 12,
-                        color: Colors.blue.shade800,
-                      ),
-                    ),
+          return Opacity(
+            opacity: isClaimed ? 0.6 : 1.0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              trailing: ElevatedButton(
-                onPressed: (isCompleted && !isClaimed) ? () => _claimReward(task) : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isClaimed ? Colors.grey : (isCompleted ? Colors.green : task.color),
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: isClaimed ? Colors.grey.shade400 : task.color.withOpacity(0.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                leading: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: task.color.withOpacity(0.2),
+                  child: Icon(task.icon, color: task.color, size: 26),
+                ),
+                title: Text(
+                  task.name,
+                  style: GoogleFonts.fredoka(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
                   ),
                 ),
-                child: Text(
-                  isClaimed ? 'Claimed' : (isCompleted ? 'Claim' : 'Do Task'),
-                  style: GoogleFonts.fredoka(fontSize: 12),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(
+                      task.description,
+                      style: GoogleFonts.fredoka(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Text(
+                          'Progress: $progressText',
+                          style: GoogleFonts.fredoka(
+                            fontSize: 12,
+                            color: !_petData.containsKey(task.currentCountKey)
+                                ? Colors.red.shade400
+                                : (isCompleted ? Colors.green.shade700 : Colors.orange.shade700),
+                            fontWeight: FontWeight.w500
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.amber.shade300),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.monetization_on, size: 14, color: Colors.amber.shade700),
+                              const SizedBox(width: 3),
+                              Text(
+                                '${task.coinReward}',
+                                style: GoogleFonts.fredoka(
+                                  fontSize: 12,
+                                  color: Colors.amber.shade800,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                trailing: ElevatedButton(
+                  onPressed: (isCompleted && !isClaimed) ? () => _claimReward(task) : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isClaimed ? Colors.grey.shade500 : (isCompleted ? Colors.green.shade600 : task.color),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: isClaimed ? Colors.grey.shade400 : task.color.withOpacity(0.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  child: Text(
+                    isClaimed ? 'Claimed' : (isCompleted ? 'Claim' : 'Do Task'),
+                    style: GoogleFonts.fredoka(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 } 

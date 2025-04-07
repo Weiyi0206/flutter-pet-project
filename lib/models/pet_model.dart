@@ -46,6 +46,13 @@ class PetModel {
     'groomsToday': 0,
     'lastGroomDate': null,
 
+    // --- ADDED: New Task Counters ---
+    'chatsToday': 0,
+    'diaryEntriesToday': 0,
+    'viewedTipsToday': 0,
+    // 'checkedInToday': 0, // REMOVED
+    // --- END ADDED ---
+
     // --- Task fields ---
     'dailyTaskStatus': <String, bool>{},
     'lastTaskStatusResetDate': null,
@@ -74,6 +81,9 @@ class PetModel {
       _petData['mood'] = 'Content';
       // --- ADD initial value for new timestamp ---
       _petData['lastHappinessUpdateTime'] = FieldValue.serverTimestamp();
+      _petData['chatsToday'] = 0;
+      _petData['diaryEntriesToday'] = 0;
+      _petData['viewedTipsToday'] = 0;
       await docRef.set(_petData);
     } else {
        // Ensure existing documents have the fields
@@ -94,10 +104,12 @@ class PetModel {
        if (data['groomsToday'] == null) updates['groomsToday'] = 0;
        if (data['lastGroomDate'] == null) updates['lastGroomDate'] = FieldValue.serverTimestamp();
 
-       // --- ADD check for the new timestamp ---
-       if (data['lastHappinessUpdateTime'] == null) {
-         updates['lastHappinessUpdateTime'] = FieldValue.serverTimestamp();
-       }
+       // --- ADDED: Ensure new task counters exist --- 
+       if (data['chatsToday'] == null) updates['chatsToday'] = 0;
+       if (data['diaryEntriesToday'] == null) updates['diaryEntriesToday'] = 0;
+       if (data['viewedTipsToday'] == null) updates['viewedTipsToday'] = 0;
+       // if (data['checkedInToday'] == null) updates['checkedInToday'] = 0; // REMOVED
+       // --- END ADDED --- 
 
        // Remove obsolete fields
        if (data.containsKey('energy')) updates['energy'] = FieldValue.delete();
@@ -146,6 +158,10 @@ class PetModel {
         _petData['mealsToday'] = _petData['mealsToday'] as int? ?? 0;
         _petData['playsToday'] = _petData['playsToday'] as int? ?? 0;
         _petData['groomsToday'] = _petData['groomsToday'] as int? ?? 0;
+        _petData['chatsToday'] = _petData['chatsToday'] as int? ?? 0;
+        _petData['diaryEntriesToday'] = _petData['diaryEntriesToday'] as int? ?? 0;
+        _petData['viewedTipsToday'] = _petData['viewedTipsToday'] as int? ?? 0;
+        // _petData['checkedInToday'] = _petData['checkedInToday'] as int? ?? 0; // REMOVED
         _petData['happiness'] = _petData['happiness'] as int? ?? 80; // Ensure happiness exists
 
         // Ensure task status is the correct type
@@ -206,6 +222,15 @@ class PetModel {
           dailyResets['lastTaskStatusResetDate'] = FieldValue.serverTimestamp();
            _petData['lastTaskStatusResetDate'] = now; // Update local date immediately
         }
+
+        // --- ADDED: Reset new task counters --- 
+        if (isNewDayForTasks) { // Only reset these if it's a new task day
+            dailyResets['chatsToday'] = 0;
+            dailyResets['diaryEntriesToday'] = 0;
+            dailyResets['viewedTipsToday'] = 0;
+            // dailyResets['checkedInToday'] = 0; // REMOVED
+        }
+        // --- END ADDED --- 
 
         // Apply and persist resets if needed
         if (dailyResets.isNotEmpty) {
@@ -607,4 +632,56 @@ class PetModel {
         return [];
      }
   }
+
+  // --- ADDED: Task Tracking Methods ---
+
+  // Call when a chat message is sent
+  Future<void> incrementChatCount() async {
+    try {
+      final currentCount = _petData['chatsToday'] as int? ?? 0;
+      final newCount = currentCount + 1;
+      final updates = {'chatsToday': newCount};
+      _petData['chatsToday'] = newCount; // Update local cache
+      await updatePetData(updates);
+      print("[PetModel] chatsToday incremented to $newCount");
+    } catch (e) {
+      print("Error incrementing chat count: $e");
+      rethrow;
+    }
+  }
+
+  // Call when a diary entry is saved
+  Future<void> incrementDiaryEntryCount() async {
+    try {
+      final currentCount = _petData['diaryEntriesToday'] as int? ?? 0;
+      final newCount = currentCount + 1;
+      final updates = {'diaryEntriesToday': newCount};
+      _petData['diaryEntriesToday'] = newCount; // Update local cache
+      await updatePetData(updates);
+      print("[PetModel] diaryEntriesToday incremented to $newCount");
+    } catch (e) {
+      print("Error incrementing diary entry count: $e");
+      rethrow;
+    }
+  }
+
+  // Call when the daily tips screen is viewed
+  Future<void> markTipViewed() async {
+    try {
+      // This task usually only needs to be done once per day
+      if ((_petData['viewedTipsToday'] as int? ?? 0) == 0) {
+        final updates = {'viewedTipsToday': 1};
+        _petData['viewedTipsToday'] = 1; // Update local cache
+        await updatePetData(updates);
+        print("[PetModel] viewedTipsToday marked as 1");
+      } else {
+        print("[PetModel] Daily tip already viewed today.");
+      }
+    } catch (e) {
+      print("Error marking tip viewed: $e");
+      rethrow;
+    }
+  }
+
+  // --- END ADDED: Task Tracking Methods ---
 } 
