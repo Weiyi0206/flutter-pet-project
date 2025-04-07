@@ -20,6 +20,8 @@ import 'screens/tests_list_screen.dart';
 import 'services/attendance_service.dart';
 import 'screens/diary_screen.dart'; // Add this import
 import 'services/emotion_service.dart';
+import 'models/pet_model.dart';
+import 'screens/pet_interactions_screen.dart';
 
 
 void main() async {
@@ -108,16 +110,18 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _happiness = 50;
-  String _petStatus = 'Normal';
-  String? _currentMood;
+  final List<ChatMessage> _messages = [];
   final TextEditingController _chatController = TextEditingController();
   final GeminiService _geminiService = GeminiService();
-  final List<ChatMessage> _messages = [];
+
+  // Add PetModel instance
+  final PetModel _petModel = PetModel();
+  Map<String, dynamic> _petData = {};
+
+  int _happiness = 50;
+  String _petStatus = 'Normal';
   String? _currentResponse;
   String? _lastUserMessage;
-  bool _isVisualizationActive = false;
-  bool _hasCompletedActivityToday = false;
   int _consecutiveNegativeChats = 0;
   final int _negativeThreshold = 3;
   int _consecutiveNegativeMoods = 0;
@@ -131,71 +135,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Timer? _tipTimer;
   final Random _random = Random();
-  final List<Map<String, String>> _dailyTips = [
-    {
-      'text': '''Quick Breath! 🧘‍♂️
-• In (4s)
-• Hold (4s)
-• Out (4s)
-Let's do it!''',
-      'category': 'breathing',
-    },
-    {
-      'text': '''Self-Care Check 💧
-• Water?
-• Stretch?
-• Break?
-Take care!''',
-      'category': 'self-care',
-    },
-    {
-      'text': '''Quick Move! 🤸‍♂️
-Choose:
-• 10 stretches
-• 30s march
-• Short walk''',
-      'category': 'exercise',
-    },
-    {
-      'text': '''Mindful Moment 😊
-Notice:
-• 3 sights
-• 2 touches
-• 1 sound''',
-      'category': 'mindfulness',
-    },
-    {
-      'text': '''Present Time 🌟
-• Deep breath
-• Feel body
-• Let thoughts go''',
-      'category': 'mindfulness',
-    },
-    {
-      'text': '''Eye Break! 👀
-20-20-20:
-• Look away
-• 20 feet far
-• 20 seconds''',
-      'category': 'self-care',
-    },
-    {
-      'text': '''Gratitude 🙏
-Think of:
-• A friend
-• A win
-• A joy''',
-      'category': 'mindfulness',
-    },
-    {
-      'text': '''Move Time! 🚶‍♂️
-Pick one:
-• Quick walk
-• Stretches
-• Desk moves''',
-      'category': 'exercise',
-    },
-  ];
 
   List<Map<String, String>> _unusedTips = [];
 
@@ -211,34 +150,7 @@ Pick one:
   int _connectionStreak = 0;
   DateTime? _lastConnectionDate;
 
-  bool _isBreathingExerciseActive = false;
-  int _breathingStep = 0;
-  int _breathingCount = 0;
-
-  List<Map<String, dynamic>> _achievements = [];
-  int _achievementPoints = 0;
   int _totalHappinessCoins = 0; // Add this line to track happiness coins
-
-  final Map<String, bool> _dailyRoutineItems = {
-    "Morning check-in": false,
-    "Hydration reminder": false,
-    "Movement break": false,
-    "Evening reflection": false,
-  };
-
-  final List<String> _affirmations = [
-    "You are enough just as you are.",
-    "You're doing better than you think.",
-    "Small steps forward are still progress.",
-    "Your worth isn't measured by productivity.",
-    "It's okay to be a work in progress.",
-    "You deserve kindness, especially from yourself.",
-    "Your feelings are valid and important.",
-    "You have unique strengths that matter.",
-  ];
-
-  final EmotionService _emotionService = EmotionService();
-
 
   @override
   void initState() {
@@ -266,14 +178,11 @@ Pick one:
       showInitialCheckIn();
     });
 
-    // Initialize pet status
-    _updatePetStatus();
+    // Initialize pet data and status
+    _initializePet();
 
     // Check connection to AI service
     _checkAIConnection();
-
-    // Optional: Keep basic tips for pet care
-    _startTipTimer();
 
     // Schedule companionship prompts
     Timer.periodic(const Duration(minutes: 60), (timer) {
@@ -290,8 +199,6 @@ Pick one:
   void dispose() {
     _tipTimer?.cancel();
     _chatController.dispose();
-    // Cancel any active exercises
-    _isBreathingExerciseActive = false;
     super.dispose();
   }
 
@@ -312,68 +219,42 @@ Pick one:
     }
   }
 
-  void _startTipTimer() {
-    Future.delayed(const Duration(seconds: 10), () {
-      _showRandomTip();
-    });
-
-    _tipTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
-      _showRandomTip();
-    });
-  }
-
-  void _showRandomTip() {
-    if (!mounted) return;
-
-    if (_unusedTips.isEmpty) {
-      _unusedTips = List.from(_dailyTips);
+  void _petThePet() async {
+    try {
+      await _petModel.petPet();
+      _petData = await _petModel.loadPetData();
+      setState(() {
+        _updatePetStatus();
+      });
+    } catch (e) {
+      print('Error petting pet: $e');
     }
-
-    final randomIndex = _random.nextInt(_unusedTips.length);
-    final tip = _unusedTips[randomIndex];
-    _unusedTips.removeAt(randomIndex);
-
-    final now = DateTime.now();
-    final timeString =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-
-    setState(() {
-      _currentResponse = tip['text'];
-      _messages.add(
-        ChatMessage(text: tip['text']!, isUser: false, timestamp: timeString),
-      );
-    });
-
-    Future.delayed(const Duration(seconds: 20), () {
-      if (mounted && _currentResponse == tip['text']) {
-        setState(() {
-          _currentResponse = null;
-        });
-      }
-    });
   }
 
-  void _petThePet() {
-    setState(() {
-      _happiness = min(_happiness + 10, 100);
-      _updatePetStatus();
-    });
-  }
-
-  void _feedThePet() {
-    setState(() {
-      _happiness = min(_happiness + 15, 100);
-      _updatePetStatus();
-    });
+  void _feedThePet() async {
+    try {
+      await _petModel.feedPet();
+      _petData = await _petModel.loadPetData();
+      setState(() {
+        _updatePetStatus();
+      });
+    } catch (e) {
+      print('Error feeding pet: $e');
+    }
   }
 
   void _updatePetStatus() {
-    if (_happiness >= 80) {
-      _petStatus = 'Happy';
-    } else if (_happiness >= 40) {
-      _petStatus = 'Normal';
+    // Use mood from pet data if available, otherwise use happiness level
+    if (_petData.isNotEmpty && _petData.containsKey('mood')) {
+      _petStatus = _petData['mood'];
     } else {
-      _petStatus = 'Sad';
+      if (_happiness >= 80) {
+        _petStatus = 'Happy';
+      } else if (_happiness >= 40) {
+        _petStatus = 'Content';
+      } else {
+        _petStatus = 'Sad';
+      }
     }
   }
 
@@ -609,58 +490,6 @@ Pick one:
     });
   }
 
-
-  void _addAchievement(
-    String title, {
-    IconData icon = Icons.star,
-    Color color = Colors.amber,
-    int points = 5,
-  }) {
-    final now = DateTime.now();
-    final dateString = '${now.day}/${now.month}/${now.year}';
-
-    setState(() {
-      _achievements.add({
-        'title': title,
-        'icon': icon,
-        'color': color,
-        'date': dateString,
-        'points': points,
-      });
-
-      _achievementPoints += points;
-      _happiness = min(_happiness + points, 100);
-      _updatePetStatus();
-
-      // Show celebration
-      _currentResponse = "Achievement unlocked: $title (+$points points)! 🎉";
-    });
-
-    // Update happiness coins from achievements
-    _updateAchievementCoins(points);
-
-    // Clear message after delay
-    Future.delayed(const Duration(seconds: 8), () {
-      if (mounted &&
-          _currentResponse?.contains("Achievement unlocked") == true) {
-        setState(() {
-          _currentResponse = null;
-        });
-      }
-    });
-  }
-  // Update happiness coins from achievements
-  Future<void> _updateAchievementCoins(int points) async {
-    final attendanceService = AttendanceService();
-
-    // First refresh the current coin count
-    await _loadHappinessCoins();
-
-    // We don't actually need to update coins here since achievements
-    // don't directly add to the happiness coins, but we refresh the display
-    // in case other activities have affected the coins
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
@@ -752,6 +581,7 @@ Pick one:
                               onPet: _petThePet,
                               onFeed: _feedThePet,
                               size: constraints.maxWidth * 0.55,
+                              petData: _petData.isNotEmpty ? _petData : null,
                             ),
                           ),
                         ),
@@ -847,18 +677,26 @@ Pick one:
                                       size: isSmallScreen ? 40 : 50,
                                     ),
                                     _buildFeatureButton(
-                                      icon: Icons.lightbulb,
-                                      label: 'Tips',
-                                      onPressed:
-                                          () => Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder:
-                                                  (context) =>
-                                                      const DailyTipsScreen(),
+                                      icon: Icons.pets,
+                                      label: 'Pet Care',
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => PetInteractionsScreen(
+                                              petModel: _petModel,
+                                              petData: _petData,
+                                              onPetDataUpdate: (updatedData) {
+                                                setState(() {
+                                                  _petData = updatedData;
+                                                  _updatePetStatus();
+                                                });
+                                              },
                                             ),
                                           ),
-                                      color: Colors.amber,
+                                        );
+                                      },
+                                      color: Colors.purple,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
                                     _buildFeatureButton(
@@ -874,6 +712,20 @@ Pick one:
                                         );
                                       },
                                       color: Colors.green,
+                                      size: isSmallScreen ? 40 : 50,
+                                    ),
+                                    _buildFeatureButton(
+                                      icon: Icons.book,
+                                      label: 'Diary',
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => const DiaryScreen(),
+                                          ),
+                                        );
+                                      },
+                                      color: Colors.teal,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
                                   ],
@@ -894,21 +746,16 @@ Pick one:
                                       width: constraints.maxWidth * 0.05,
                                     ),
                                     _buildFeatureButton(
-                                      icon: Icons.book,
-                                      label: 'Diary',
+                                      icon: Icons.sports_esports,
+                                      label: 'Play',
                                       onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder:
-                                                (context) =>
-                                                    const DiaryScreen(),
-                                          ),
-                                        );
+                                        if (_petData.isNotEmpty) {
+                                          _playWithPet();
+                                        }
                                       },
-                                      color: Colors.indigo,
+                                      color: Colors.blue,
                                       size: isSmallScreen ? 40 : 50,
-                                    ),                                  
+                                    ),
                                     SizedBox(
                                       width: constraints.maxWidth * 0.05,
                                     ),
@@ -923,10 +770,14 @@ Pick one:
                                       width: constraints.maxWidth * 0.05,
                                     ),
                                     _buildFeatureButton(
-                                      icon: Icons.chat_bubble_outline,
-                                      label: 'Talk to Me',
-                                      onPressed: _showCompanionshipPrompt,
-                                      color: Colors.blue,
+                                      icon: Icons.cleaning_services,
+                                      label: 'Groom',
+                                      onPressed: () {
+                                        if (_petData.isNotEmpty) {
+                                          _groomPet();
+                                        }
+                                      },
+                                      color: Colors.green,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
                                   ],
@@ -1607,6 +1458,44 @@ Pick one:
       setState(() {
         _totalHappinessCoins = coins;
       });
+    }
+  }
+
+  // Add method to initialize pet
+  Future<void> _initializePet() async {
+    try {
+      await _petModel.initializePet();
+      _petData = await _petModel.loadPetData();
+      setState(() {
+        _updatePetStatus();
+      });
+    } catch (e) {
+      print('Failed to initialize pet: $e');
+    }
+  }
+
+  // Add methods for play and groom
+  void _playWithPet() async {
+    try {
+      await _petModel.playWithPet();
+      _petData = await _petModel.loadPetData();
+      setState(() {
+        _updatePetStatus();
+      });
+    } catch (e) {
+      print('Error playing with pet: $e');
+    }
+  }
+
+  void _groomPet() async {
+    try {
+      await _petModel.groomPet();
+      _petData = await _petModel.loadPetData();
+      setState(() {
+        _updatePetStatus();
+      });
+    } catch (e) {
+      print('Error grooming pet: $e');
     }
   }
 }
