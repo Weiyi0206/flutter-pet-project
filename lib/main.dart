@@ -411,7 +411,6 @@ class _MyHomePageState extends State<MyHomePage> {
   // --- Update Interaction Methods ---
 
   void _petThePet() async {
-    // Cooldown check already handled by button state, but keep for safety
     if (_getRemainingCooldown('pet') > Duration.zero) {
       _showCooldownMessage('Petting');
       return;
@@ -422,8 +421,13 @@ class _MyHomePageState extends State<MyHomePage> {
       print('[_petThePet] _petModel.petPet() completed.');
       _petData = await _petModel.loadPetData();
       print('[_petThePet] _petModel.loadPetData() completed.');
+
+      // --- ADD Animation Trigger ---
+      _animatedPetKey.currentState?.triggerPet();
+      // --- END ADD ---
+
       _updatePetStatsFromData();
-      _updateCooldownTimer('pet'); // Update timer after action
+      _updateCooldownTimer('pet');
     } catch (e) {
       print('Error petting pet: $e');
       if (mounted) { // Show error to user
@@ -445,8 +449,13 @@ class _MyHomePageState extends State<MyHomePage> {
       print('[_feedThePet] _petModel.feedPet() completed.');
       _petData = await _petModel.loadPetData();
       print('[_feedThePet] _petModel.loadPetData() completed.');
+
+      // --- ADD Animation Trigger ---
+      _animatedPetKey.currentState?.triggerFeed();
+      // --- END ADD ---
+
       _updatePetStatsFromData();
-      _updateCooldownTimer('feed'); // Update timer after action
+      _updateCooldownTimer('feed');
     } catch (e) {
       print('Error feeding pet: $e');
        if (mounted) { // Show error to user
@@ -469,11 +478,10 @@ class _MyHomePageState extends State<MyHomePage> {
       _petData = await _petModel.loadPetData();
       print('[_playWithPet] _petModel.loadPetData() completed.');
 
-      // --- Trigger animation ---
       _animatedPetKey.currentState?.triggerPlay();
 
       _updatePetStatsFromData();
-      _updateCooldownTimer('play'); // Update timer after action
+      _updateCooldownTimer('play');
     } catch (e) {
       print('Error playing with pet: $e');
        if (mounted) { // Show error to user
@@ -496,11 +504,10 @@ class _MyHomePageState extends State<MyHomePage> {
       _petData = await _petModel.loadPetData();
       print('[_groomPet] _petModel.loadPetData() completed.');
 
-      // --- Trigger animation ---
       _animatedPetKey.currentState?.triggerGroom();
 
       _updatePetStatsFromData();
-      _updateCooldownTimer('groom'); // Update timer after action
+      _updateCooldownTimer('groom');
     } catch (e) {
       print('Error grooming pet: $e');
        if (mounted) { // Show error to user

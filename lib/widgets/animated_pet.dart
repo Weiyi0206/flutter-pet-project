@@ -146,6 +146,14 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
   void triggerGroom() {
     _triggerGroomAnimation();
   }
+
+  void triggerPet() {
+    _triggerPetAnimation();
+  }
+
+  void triggerFeed() {
+    _triggerFeedAnimation();
+  }
   // --- End added methods ---
   
   @override
@@ -160,14 +168,8 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
     final Duration idleBobDuration = _calculateIdleBobDuration();
 
     return GestureDetector(
-      onTap: () {
-        widget.onPet();
-        _triggerPetAnimation();
-      },
-      onDoubleTap: () {
-        widget.onFeed();
-        _triggerFeedAnimation();
-      },
+      onTap: widget.onPet,
+      onDoubleTap: widget.onFeed,
       child: Container(
         width: widget.size,
         height: widget.size,
@@ -296,8 +298,11 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
           end: const Offset(1.12, 1.12),
           duration: 350.ms,
           curve: Curves.easeOutBack,
-        )
-        .then()
+        ).shake(
+           hz: 5,
+           duration: 600.ms,
+           offset: const Offset(0.5, 0)
+        ).then(delay: 200.ms)
         .scale(
           end: const Offset(1.0, 1.0),
           duration: 400.ms,
@@ -305,24 +310,9 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
         );
     } else if (_isBeingFed) {
       return baseWidget.animate()
-        .rotate(
-          begin: -0.08,
-          end: 0.08,
-          duration: 150.ms,
-          curve: Curves.easeInOutSine,
-        )
-        .then()
-        .rotate(
-          end: -0.08,
-          duration: 150.ms,
-          curve: Curves.easeInOutSine,
-        )
-        .then()
-        .rotate(
-          end: 0.0,
-          duration: 150.ms,
-          curve: Curves.easeInOutSine,
-        );
+          .moveY(begin: 0, end: -8, duration: 150.ms, curve: Curves.easeOut)
+          .then()
+          .moveY(end: 0, duration: 250.ms, curve: Curves.bounceOut);
     } else if (_isPlaying) {
       return baseWidget.animate()
         .moveY(
@@ -537,7 +527,7 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
       return baseWidget.animate()
         .scale(
           begin: const Offset(1.0, 1.0),
-          end: const Offset(1.0, 0.15),
+          end: const Offset(1.0, 0.1),
           duration: 300.ms,
           curve: Curves.easeOut,
         )
@@ -552,7 +542,7 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
       return baseWidget.animate()
         .scale(
           begin: const Offset(1.0, 1.0),
-          end: const Offset(1.15, 1.15),
+          end: const Offset(1.2, 1.2),
           duration: 200.ms,
           curve: Curves.easeOutBack,
         )
@@ -579,22 +569,23 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
         );
     } else if (isIdle) {
       return baseWidget.animate(onPlay: (c) => c.repeat())
+         // 1. Start with the delay (representing the open state duration)
+         .then(delay: math.Random().nextInt(3500).toDouble().ms + 1500.ms)
+         // 2. Close the eye
         .scale(
-          begin: const Offset(1.0, 1.0),
-          end: const Offset(1.0, 0.05),
-          duration: 100.ms,
+          begin: const Offset(1.0, 1.0), // Ensure start is open
+          end: const Offset(1.0, 0.05), // Close
+          duration: 200.ms, // Closing duration
           curve: Curves.easeOut,
         )
-        .then(
-          delay: 80.ms,
-        )
+         // 3. Delay while closed
+        .then(delay: 150.ms)
+         // 4. Open the eye
         .scale(
-          end: const Offset(1.0, 1.0),
-          duration: 150.ms,
+          // Start from closed state is implied by the chain
+          end: const Offset(1.0, 1.0), // Open
+          duration: 250.ms, // Opening duration
           curve: Curves.easeIn,
-        )
-        .then(
-          delay: math.Random().nextInt(3500).toDouble().ms + 1500.ms,
         );
     }
     return baseWidget;
@@ -604,16 +595,16 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
     if (_isBeingFed) {
       return Container(
         width: width * 0.6,
-        height: width * 0.6,
+        height: width * 0.4,
         decoration: BoxDecoration(
           color: Colors.pink.shade200,
-          shape: BoxShape.circle,
+          borderRadius: BorderRadius.circular(width * 0.2),
           border: Border.all(color: _getStatusColor().darker(30), width: 1.0),
         ),
-      ).animate()
-        .scaleXY(begin: 0.5, end: 1.0, duration: 200.ms, curve: Curves.easeOut)
-        .then(delay: 400.ms)
-        .scaleXY(end: 0.5, duration: 200.ms);
+      ).animate(onPlay: (c)=> c.repeat(reverse: true, count: 2))
+        .scaleXY(begin: 1.0, end: 1.5, duration: 150.ms, curve: Curves.easeOut)
+        .then(delay: 50.ms)
+        .scaleXY(end: 0.8, duration: 150.ms, curve: Curves.easeIn);
     } else if (_isUnhappy) {
       return CustomPaint(
         size: Size(width, width * 0.3),
@@ -622,7 +613,7 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
     } else if (widget.status == 'Happy' || widget.status == 'Ecstatic' || _isBeingPet) {
       return CustomPaint(
         size: Size(width * 1.1, width * 0.4),
-        painter: _MouthPainter(isHappy: true, mouthWidth: width * 1.1, color: _getStatusColor().darker(30), curvature: 1.0),
+        painter: _MouthPainter(isHappy: true, mouthWidth: width * 1.1, color: _getStatusColor().darker(30), curvature: 1.2),
       );
     } else {
       return Container(
@@ -686,26 +677,26 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
       children: List.generate(3, (index) => Positioned(
         child: Icon(
           Icons.favorite,
-          color: Colors.pink.withOpacity(0.7),
+          color: Colors.pink.withOpacity(0.8),
           size: widget.size * (0.25 - index * 0.05),
-        ).animate(delay: (index * 60).ms)
+        ).animate(delay: (index * 80).ms)
           .scale(
             begin: const Offset(0.3, 0.3),
-            end: const Offset(1.4, 1.4),
-            duration: 700.ms,
+            end: const Offset(1.5, 1.5),
+            duration: 600.ms,
             curve: Curves.elasticOut,
           )
           .moveY(
-            begin: 5,
-            end: -25,
-            duration: 700.ms,
+            begin: 0,
+            end: -30,
+            duration: 800.ms,
             curve: Curves.easeOut,
           )
-          .then()
+          .then(delay: 100.ms)
           .fade(
             begin: 1,
             end: 0,
-            duration: 200.ms,
+            duration: 300.ms,
           ),
       )),
     );
@@ -717,31 +708,16 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
       left: widget.size * 0.35,
       right: widget.size * 0.35,
       child: Icon(
-        Icons.restaurant,
-        color: Colors.orange.withOpacity(0.7),
+        Icons.bakery_dining,
+        color: Colors.brown.withOpacity(0.9),
         size: widget.size * 0.22,
       ).animate()
         .fadeIn(duration: 150.ms)
-        .move(
-          begin: const Offset(0, 20),
-          end: const Offset(0, 0),
-          duration: 300.ms,
-          curve: Curves.easeOut,
-        )
-        .scale(
-          begin: const Offset(0.5, 0.5),
-          end: const Offset(1.0, 1.0),
-          duration: 300.ms,
-        )
-        .then(
-          delay: 350.ms,
-        )
-        .scale(
-          end: const Offset(0.0, 0.0),
-          duration: 250.ms,
-          curve: Curves.easeIn,
-        )
-        .fadeOut(duration: 200.ms),
+        .moveY(begin: 15, end: 0, duration: 300.ms, curve: Curves.easeOut)
+        .scale(begin: const Offset(0.5, 0.5), end: const Offset(1.0, 1.0), duration: 300.ms)
+        .then(delay: 350.ms)
+        .scale(end: const Offset(0.0, 0.0), duration: 200.ms, curve: Curves.easeIn)
+        .fadeOut(duration: 150.ms),
     );
   }
   
