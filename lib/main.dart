@@ -22,6 +22,8 @@ import 'screens/diary_screen.dart'; // Add this import
 import 'services/emotion_service.dart';
 import 'models/pet_model.dart';
 import 'screens/pet_tasks_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart'; // Add for date formatting
 
 // --- Added PetTask class ---
 // Define a Task class for better structure (copied from pet_tasks_screen.dart)
@@ -240,9 +242,12 @@ class _MyHomePageState extends State<MyHomePage> {
   // --- Fix GlobalKey type ---
   final GlobalKey<AnimatedPetState> _animatedPetKey = GlobalKey<AnimatedPetState>(); // Use the public 'AnimatedPetState'
 
+  String _userId = FirebaseAuth.instance.currentUser?.uid ?? ''; // Store userId
+
   @override
   void initState() {
     super.initState();
+    _userId = FirebaseAuth.instance.currentUser?.uid ?? ''; // Ensure userId is set
 
     void showInitialCheckIn() async {
       final attendanceService = AttendanceService();
@@ -266,8 +271,8 @@ class _MyHomePageState extends State<MyHomePage> {
       showInitialCheckIn();
     });
 
-    // Initialize pet data and status/stats
-    _initializePet();
+    // Initialize pet data AND load today's chat
+    _initializePetAndLoadChat();
 
     // Check connection to AI service
     _checkAIConnection();
@@ -527,14 +532,31 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _sendMessage() async {
     if (_chatController.text.trim().isEmpty) return;
+    if (_userId.isEmpty) {
+        print("Cannot send message: User ID is empty.");
+        // Optionally show a message to the user
+        return;
+    }
 
-    final userMessage = _chatController.text;
-    final now = DateTime.now();
-    final timeString =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final userMessageText = _chatController.text;
+    final now = DateTime.now(); // Get current time once
+
+    // Create local message object for immediate display
+    final localMessage = ChatMessage(
+      text: userMessageText,
+      isUser: true,
+      timestamp: now, // Use the actual DateTime
+    );
+
+    // Prepare data map for Firestore Saving - Use Timestamp.fromDate()
+    final messageDataForSave = {
+      'text': userMessageText,
+      'isUser': true,
+      'timestamp': Timestamp.fromDate(now), // Convert DateTime to Firestore Timestamp
+    };
 
     // Enhanced mood detection from the message
-    final moodResult = _detectMoodFromText(userMessage);
+    final moodResult = _detectMoodFromText(userMessageText);
     final hasEmotionalContent = moodResult['lonely'] == true || 
                                moodResult['anxious'] == true || 
                                moodResult['sad'] == true || 
@@ -542,46 +564,67 @@ class _MyHomePageState extends State<MyHomePage> {
     final detectedMood = moodResult['mood'];
 
     // Check for signs of distress in the message
-    _processChatMessage(userMessage);
+    _processChatMessage(userMessageText);
 
-    // Store the message in history
+    // --- Update UI Immediately & Save to DB ---
     setState(() {
-      _messages.add(
-        ChatMessage(text: userMessage, isUser: true, timestamp: timeString),
-      );
-      _lastUserMessage = userMessage;
+      _messages.add(localMessage); // Add to local list for UI
+      _lastUserMessage = userMessageText;
       _chatController.clear();
-
-      // Clear any previous response while waiting for new one
       _currentResponse = null;
     });
 
+    // Save user message to Firestore asynchronously
     try {
-      String response;
+       await _petModel.saveChatMessage(messageDataForSave); // Pass map with Timestamp.fromDate()
+       print("User message saved to Firestore.");
+    } catch (e) {
+       print("Error saving user message: $e");
+       // Optionally revert UI update or show error
+       if(mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text('Error saving your message.'), backgroundColor: Colors.red),
+           );
+           // Consider removing the message from the local list if saving failed
+           // setState(() { _messages.remove(localMessage); });
+       }
+    }
+    // --- End Update UI & Save to DB ---
+
+    // --- Get AI Response ---
+    try {
+      String responseText;
       
       // Use the enhanced mental health response if emotional content is detected
       if (hasEmotionalContent) {
-        response = await _geminiService.getMentalHealthResponse(userMessage, moodResult);
+        responseText = await _geminiService.getMentalHealthResponse(userMessageText, moodResult);
       } else {
         // Otherwise use the standard chat response
-        response = await _geminiService.getChatResponse(
-          userMessage,
+        responseText = await _geminiService.getChatResponse(
+          userMessageText,
           _happiness,
           _petStatus,
           moodResult['lonely'] ?? false,
         );
       }
 
-      // Store the response in history and show it
-      if (mounted) {
-        // Reload pet data after interaction (optional, depends if chat affects stats)
-        // _petData = await _petModel.loadPetData();
+      // Create response message object
+      final responseTimestamp = DateTime.now(); // Get time for response
+      final localResponse = ChatMessage(
+          text: responseText, isUser: false, timestamp: responseTimestamp);
 
-        setState(() { // Keep setState for message list updates
-          _messages.add(
-            ChatMessage(text: response, isUser: false, timestamp: timeString),
-          );
-          _currentResponse = response;
+      // Prepare response data for saving - Use Timestamp.fromDate()
+       final responseDataForSave = {
+         'text': responseText,
+         'isUser': false,
+         'timestamp': Timestamp.fromDate(responseTimestamp), // Convert DateTime to Firestore Timestamp
+       };
+
+      if (mounted) {
+        // Update UI with response
+        setState(() {
+          _messages.add(localResponse);
+          _currentResponse = responseText; // For the speech bubble
 
           // Adjust happiness based on detected mood - reward the user for sharing
           if (hasEmotionalContent) {
@@ -598,23 +641,41 @@ class _MyHomePageState extends State<MyHomePage> {
           // Note: Consider if happiness should directly affect petData and be saved
         });
 
-        // Update pet stats/status based on potentially changed happiness/data
-        _updatePetStatsFromData(); // Call this AFTER state updates potentially affecting mood
+        // Save AI response to Firestore asynchronously
+        try {
+           await _petModel.saveChatMessage(responseDataForSave); // Pass map with Timestamp.fromDate()
+           print("AI response saved to Firestore.");
+        } catch (e) {
+           print("Error saving AI response: $e");
+            if(mounted) {
+               ScaffoldMessenger.of(context).showSnackBar(
+                 SnackBar(content: Text('Error saving AI response.'), backgroundColor: Colors.red),
+               );
+               // Consider removing the response from the local list
+               // setState(() { _messages.remove(localResponse); });
+            }
+        }
 
-        // Remove pet response after a delay
+        _updatePetStatsFromData(); // Update pet status
+
+        // Remove speech bubble after delay
         Future.delayed(const Duration(seconds: 15), () {
-          if (mounted && _currentResponse == response) {
-            setState(() {
-              _currentResponse = null;
-            });
+          if (mounted && _currentResponse == responseText) {
+            setState(() { _currentResponse = null; });
           }
         });
       }
     } catch (e) {
+      // Handle AI error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error getting response: $e'), backgroundColor: Colors.red),
         );
+        // Maybe add an error message to the chat?
+        // final errorTimestamp = DateTime.now();
+        // setState(() {
+        //    _messages.add(ChatMessage(text: "Sorry, I couldn't respond.", isUser: false, timestamp: errorTimestamp));
+        // });
       }
     }
   }
@@ -814,12 +875,19 @@ class _MyHomePageState extends State<MyHomePage> {
             icon: const Icon(Icons.history),
             tooltip: 'Chat History',
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ChatHistoryScreen(messages: _messages),
-                ),
-              );
+              if (_userId.isNotEmpty) { // Only navigate if user ID is available
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    // Pass userId instead of the local messages list
+                    builder: (context) => ChatHistoryScreen(userId: _userId),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Cannot view history. User not logged in.'), backgroundColor: Colors.orange),
+                );
+              }
             },
           ),
           IconButton(
@@ -1861,43 +1929,105 @@ class _MyHomePageState extends State<MyHomePage> {
      }
   }
 
-  // Override _initializePet and interaction methods to update timers after loading data
-  Future<void> _initializePet() async {
-    print('[_initializePet] Initializing pet...');
+  // Combined initialization
+  Future<void> _initializePetAndLoadChat() async {
+    print('[_initializePetAndLoadChat] Initializing pet and loading today\'s chat...');
     try {
       await _petModel.initializePet();
-      print('[_initializePet] _petModel.initializePet() completed.');
+      print('[_initializePetAndLoadChat] _petModel.initializePet() completed.');
       _petData = await _petModel.loadPetData();
-      print('[_initializePet] _petModel.loadPetData() completed.');
+      print('[_initializePetAndLoadChat] _petModel.loadPetData() completed.');
+
+      // --- Load Today's Chat ---
+      await _loadTodaysChatHistory();
+      // --- End Load Today's Chat ---
+
       _updatePetStatsFromData(); // Update state, UI, and calculate tasks
       _updateAllCooldownTimers(); // Start/update timers after loading
-      print('[_initializePet] Initial update complete.');
+      print('[_initializePetAndLoadChat] Initial update complete.');
     } catch (e) {
-      print('Failed to initialize pet: $e');
+      print('Failed to initialize pet or load chat: $e');
       if (mounted) {
           setState(() {
              _petStatus = 'Error';
              _petsTodayCount = 0;
              _mealsTodayCount = 0;
              _completedTasksCount = 0; // Reset task count on error
-             // Initialize _petData to avoid null errors in build
+             _messages.clear(); // Clear messages on error
              _petData = {'happiness': 0, 'lastInteractionTimes': {}}; // Ensure lastInteractionTimes exists
           });
       }
     }
+  }
+
+  // New method to load chat history for the current day
+  Future<void> _loadTodaysChatHistory() async {
+     if (_userId.isEmpty) return; // Don't load if no user
+     print("[_loadTodaysChatHistory] Loading chat history for today...");
+     final todayString = DateFormat('yyyy-MM-dd').format(DateTime.now());
+     try {
+        final List<Map<String, dynamic>> historyData = await _petModel.loadChatHistoryForDate(todayString);
+        final List<ChatMessage> todaysMessages = historyData
+            .map((data) => ChatMessage.fromMap(data))
+            .toList();
+
+        // Sort messages by timestamp just in case they aren't stored perfectly ordered
+        todaysMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+        if (mounted) {
+           setState(() {
+              _messages.clear(); // Clear previous messages (if any)
+              _messages.addAll(todaysMessages); // Add loaded messages
+           });
+           print("[_loadTodaysChatHistory] Loaded ${_messages.length} messages for today.");
+        }
+     } catch (e) {
+        print("Error loading today's chat history: $e");
+        if (mounted) {
+           setState(() { _messages.clear(); }); // Clear messages on error
+           ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not load today\'s chat: $e'), backgroundColor: Colors.red),
+           );
+        }
+     }
+  }
+
+  // Update the old _initializePet to call the new combined one
+  Future<void> _initializePet() async {
+     await _initializePetAndLoadChat();
   }
 }
 
 class ChatMessage {
   final String text;
   final bool isUser;
-  final String timestamp;
+  final DateTime timestamp;
 
   ChatMessage({
     required this.text,
     required this.isUser,
     required this.timestamp,
   });
+
+  // Optional: Factory constructor to create from Firestore data
+  factory ChatMessage.fromMap(Map<String, dynamic> map) {
+    return ChatMessage(
+      text: map['text'] as String? ?? '',
+      isUser: map['isUser'] as bool? ?? false,
+      // Convert Firestore Timestamp to DateTime, handle potential null
+      timestamp: (map['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
+
+  // Optional: Method to convert to a Map for Firestore saving
+  // Note: We'll use FieldValue.serverTimestamp() directly when saving for accuracy
+  Map<String, dynamic> toMapForSave() {
+    return {
+      'text': text,
+      'isUser': isUser,
+      'timestamp': FieldValue.serverTimestamp(), // Use server time when saving
+    };
+  }
 }
 
 class BubbleTrianglePainter extends CustomPainter {

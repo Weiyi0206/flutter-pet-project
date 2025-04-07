@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:intl/intl.dart';
 
 // Helper function to check if two DateTime objects represent the same calendar day
 bool _isSameDay(DateTime? date1, DateTime? date2) {
@@ -529,5 +530,81 @@ class PetModel {
        print("Error updating task status: $e");
        rethrow;
     }
+  }
+
+  // --- Chat History Methods ---
+
+  String _getChatDateString(DateTime date) {
+    return DateFormat('yyyy-MM-dd').format(date);
+  }
+
+  // Save a single chat message to the log for the current date
+  Future<void> saveChatMessage(Map<String, dynamic> messageData) async {
+    if (_userId.isEmpty) return; // Ensure user is logged in
+
+    final todayString = _getChatDateString(DateTime.now());
+    final docRef = _firestore
+        .collection('pets')
+        .doc(_userId)
+        .collection('chatHistory')
+        .doc(todayString);
+
+    try {
+      // Use set with merge:true to create doc if not exists, and arrayUnion to add message
+      await docRef.set(
+        {
+          'messages': FieldValue.arrayUnion([messageData]),
+          'lastMessageTimestamp': messageData['timestamp'] // Keep track of last message time for sorting dates
+        },
+        SetOptions(merge: true),
+      );
+      print("[PetModel] Saved chat message for date $todayString");
+    } catch (e) {
+      print("Error saving chat message: $e");
+      rethrow;
+    }
+  }
+
+  // Load chat messages for a specific date string (e.g., "2023-10-27")
+  Future<List<Map<String, dynamic>>> loadChatHistoryForDate(String dateString) async {
+    if (_userId.isEmpty) return [];
+
+    try {
+      final doc = await _firestore
+          .collection('pets')
+          .doc(_userId)
+          .collection('chatHistory')
+          .doc(dateString)
+          .get();
+
+      if (doc.exists && doc.data() != null && doc.data()!.containsKey('messages')) {
+         // Ensure messages are treated as a List<dynamic> and cast items
+         final messagesData = List<dynamic>.from(doc.data()!['messages'] ?? []);
+         // Convert list items to the expected Map type
+         return messagesData.map((msg) => Map<String, dynamic>.from(msg as Map)).toList();
+      }
+    } catch (e) {
+      print("Error loading chat history for $dateString: $e");
+    }
+    return []; // Return empty list if doc doesn't exist or error occurs
+  }
+
+  // Get a list of date strings for which chat history exists, sorted newest first
+  Future<List<String>> getChatHistoryDates() async {
+     if (_userId.isEmpty) return [];
+     try {
+        final querySnapshot = await _firestore
+           .collection('pets')
+           .doc(_userId)
+           .collection('chatHistory')
+           // Order by the timestamp of the last message within each day's log
+           .orderBy('lastMessageTimestamp', descending: true)
+           .get();
+
+        return querySnapshot.docs.map((doc) => doc.id).toList();
+     } catch (e) {
+        print("Error fetching chat history dates: $e");
+        return [];
+     }
   }
 } 
