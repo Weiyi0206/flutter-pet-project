@@ -19,7 +19,22 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'screens/tests_list_screen.dart'; 
 import 'services/attendance_service.dart';
+
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:lottie/lottie.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import 'dart:math';
+import 'services/gemini_service.dart';
+import 'screens/chat_history_screen.dart';
+import 'screens/help_support_screen.dart';
+import 'screens/attendance_screen.dart';
+import 'screens/diary_screen.dart'; // Add this import
 import 'services/emotion_service.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -204,6 +219,7 @@ Pick one:
 
   List<Map<String, dynamic>> _achievements = [];
   int _achievementPoints = 0;
+  int _totalHappinessCoins = 0; // Add this line to track happiness coins
 
   final Map<String, bool> _dailyRoutineItems = {
     "Morning check-in": false,
@@ -243,6 +259,9 @@ Pick one:
         );
       }
     }
+
+    // Load happiness coins
+    _loadHappinessCoins();
 
     // Show check-in prompt after widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -376,6 +395,9 @@ Pick one:
                                moodResult['angry'] == true;
     final detectedMood = moodResult['mood'];
 
+    // Check for signs of distress in the message
+    _processChatMessage(userMessage);
+
     // Store the message in history
     setState(() {
       _messages.add(
@@ -447,6 +469,129 @@ Pick one:
         );
       }
     }
+  }
+
+  void _showDailyCheckIn() {
+    if (!mounted) return;
+
+    final TextEditingController moodController = TextEditingController();
+    String selectedMood = 'Happy'; // Default mood
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              'How are you feeling today?',
+              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                TextField(
+                  controller: moodController,
+                  decoration: InputDecoration(
+                    hintText: 'Share your mood...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _buildMoodOption('😊', 'Happy', Colors.yellow, (mood) {
+                      selectedMood = mood;
+                    }),
+                    _buildMoodOption('😌', 'Calm', Colors.blue.shade300, (
+                      mood,
+                    ) {
+                      selectedMood = mood;
+                    }),
+                    _buildMoodOption('😐', 'Neutral', Colors.grey.shade400, (
+                      mood,
+                    ) {
+                      selectedMood = mood;
+                    }),
+                    _buildMoodOption('😔', 'Sad', Colors.indigo.shade300, (
+                      mood,
+                    ) {
+                      selectedMood = mood;
+                    }),
+                    _buildMoodOption('😡', 'Angry', Colors.red.shade400, (
+                      mood,
+                    ) {
+                      selectedMood = mood;
+                    }),
+                    _buildMoodOption('😰', 'Anxious', Colors.purple.shade300, (
+                      mood,
+                    ) {
+                      selectedMood = mood;
+                    }),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text('Later', style: GoogleFonts.fredoka()),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final moodText = moodController.text.trim();
+                  Navigator.of(context).pop();
+
+                  // Process the selected mood
+                  _updateMoodTracking(selectedMood);
+
+                  // Check for distress in their text description
+                  if (moodText.isNotEmpty) {
+                    _checkUserDistress(moodText, selectedMood);
+                  }
+
+                  // Proceed with marking attendance
+                  final attendanceService = AttendanceService();
+                  await attendanceService.markAttendanceWithMood(selectedMood);
+                },
+                child: Text('Submit', style: GoogleFonts.fredoka()),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildMoodOption(
+    String emoji,
+    String label,
+    Color color,
+    Function(String) onSelected,
+  ) {
+    return GestureDetector(
+      onTap: () => onSelected(label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color, width: 1),
+        ),
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 24)),
+            Text(label, style: GoogleFonts.fredoka(fontSize: 12)),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showCompanionshipPrompt() {
@@ -522,6 +667,9 @@ Pick one:
       _currentResponse = "Achievement unlocked: $title (+$points points)! 🎉";
     });
 
+    // Update happiness coins from achievements
+    _updateAchievementCoins(points);
+
     // Clear message after delay
     Future.delayed(const Duration(seconds: 8), () {
       if (mounted &&
@@ -532,6 +680,567 @@ Pick one:
       }
     });
   }
+  // Update happiness coins from achievements
+  Future<void> _updateAchievementCoins(int points) async {
+    final attendanceService = AttendanceService();
+
+    // First refresh the current coin count
+    await _loadHappinessCoins();
+
+    // We don't actually need to update coins here since achievements
+    // don't directly add to the happiness coins, but we refresh the display
+    // in case other activities have affected the coins
+  }
+
+  void _showSmallActivityPrompt() {
+    final activities = [
+      "Could you drink a glass of water? Even small self-care steps matter!",
+      "How about opening a window for some fresh air? It might feel nice.",
+      "Maybe stretch your arms up high for just 10 seconds?",
+      "Could you name one tiny thing you're grateful for today?",
+      "How about sending a quick message to someone you care about?",
+    ];
+
+    final activity = activities[_random.nextInt(activities.length)];
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              'Small Step Forward',
+              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  activity,
+                  style: GoogleFonts.fredoka(),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: Text(
+                        'Maybe Later',
+                        style: GoogleFonts.fredoka(color: Colors.grey),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _addAchievement("Completed a small activity");
+                        setState(() {
+                          _hasCompletedActivityToday = true;
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                      ),
+                      child: Text(
+                        'I Did It!',
+                        style: GoogleFonts.fredoka(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+
+  void _startVisualizationExercise() {
+    _isVisualizationActive = true;
+
+    final visualizationSteps = [
+      "Let's take a moment to relax. Close your eyes if you'd like.",
+      "Imagine you're in a peaceful place. Maybe a beach, forest, or anywhere you feel calm.",
+      "Notice the colors around you in this peaceful place.",
+      "Feel the temperature. Is it warm or cool?",
+      "Listen to the sounds in your peaceful place.",
+      "Take a deep breath and enjoy this moment of calm.",
+      "When you're ready, gently bring your awareness back to the present.",
+      "You can return to this peaceful place anytime you need a moment of calm.",
+    ];
+
+    _runSequentialMessages(visualizationSteps, const Duration(seconds: 10));
+
+    // End visualization after all steps
+    Future.delayed(Duration(seconds: 10 * visualizationSteps.length), () {
+      if (mounted) {
+        setState(() {
+          _isVisualizationActive = false;
+          _currentResponse = null;
+        });
+      }
+    });
+  }
+
+  void _showQuickStressRelief() {
+    final reliefOptions = [
+      {
+        "title": "Shoulder Roll",
+        "description":
+            "Roll your shoulders forward 5 times, then backward 5 times to release tension.",
+      },
+      {
+        "title": "Hand Massage",
+        "description":
+            "Gently massage your hand for 30 seconds, focusing on any tense areas.",
+      },
+      {
+        "title": "Jaw Release",
+        "description":
+            "Let your jaw relax completely for 10 seconds. Notice any tension you're holding there.",
+      },
+      {
+        "title": "Quick Stretch",
+        "description":
+            "Reach your arms up high, then slowly lower them while taking a deep breath.",
+      },
+    ];
+
+    final option = reliefOptions[_random.nextInt(reliefOptions.length)];
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              option["title"]!,
+              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  option["description"]!,
+                  style: GoogleFonts.fredoka(),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _addAchievement("Used a stress relief technique");
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                  child: Text(
+                    'I Feel Better',
+                    style: GoogleFonts.fredoka(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+
+  void _showRoutineTracker() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: Text(
+                    'Daily Routine',
+                    style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ..._dailyRoutineItems.entries.map(
+                        (entry) => CheckboxListTile(
+                          title: Text(entry.key, style: GoogleFonts.fredoka()),
+                          value: entry.value,
+                          activeColor: Colors.green,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              _dailyRoutineItems[entry.key] = value ?? false;
+                            });
+
+                            // Update in parent state too
+                            this.setState(() {});
+
+                            // If completed all items
+                            if (!_dailyRoutineItems.values.contains(false)) {
+                              Future.delayed(
+                                const Duration(milliseconds: 500),
+                                () {
+                                  Navigator.pop(context);
+                                  _addAchievement("Completed daily routine");
+                                },
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Completing your routine helps your pet stay happy!',
+                        style: GoogleFonts.fredoka(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Close', style: GoogleFonts.fredoka()),
+                    ),
+                  ],
+                ),
+          ),
+    );
+  }
+
+  void _checkRoutineProgress() {
+    // Count completed items
+    final completedCount = _dailyRoutineItems.values.where((v) => v).length;
+    final totalCount = _dailyRoutineItems.length;
+
+    // If less than half completed and it's afternoon
+    final now = DateTime.now();
+    if (completedCount < totalCount / 2 && now.hour >= 14 && now.hour <= 20) {
+      setState(() {
+        _currentResponse =
+            "Don't forget about your daily routine! It helps both of us stay happy and healthy.";
+      });
+
+      // Clear message after delay
+      Future.delayed(const Duration(seconds: 10), () {
+        if (mounted && _currentResponse?.contains("routine") == true) {
+          setState(() {
+            _currentResponse = null;
+          });
+        }
+      });
+    }
+  }
+
+  void _showAffirmation() {
+    final affirmation = _affirmations[_random.nextInt(_affirmations.length)];
+
+    setState(() {
+      _currentResponse = "Remember: $affirmation";
+    });
+
+    // Clear message after delay
+    Future.delayed(const Duration(seconds: 12), () {
+      if (mounted && _currentResponse?.contains("Remember:") == true) {
+        setState(() {
+          _currentResponse = null;
+        });
+      }
+    });
+  }
+
+  void _promptStrengthRecognition() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              'Your Strengths',
+              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'What\'s one small thing you did well today?',
+                  style: GoogleFonts.fredoka(),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'I did well at...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  onSubmitted: (value) {
+                    if (value.isNotEmpty) {
+                      Navigator.pop(context);
+                      _addAchievement("Recognized a personal strength");
+
+                      // Pet responds with encouragement
+                      _geminiService.getStrengthResponse(value).then((
+                        response,
+                      ) {
+                        setState(() {
+                          _currentResponse = response;
+                        });
+
+                        // Clear message after delay
+                        Future.delayed(const Duration(seconds: 15), () {
+                          if (mounted && _currentResponse == response) {
+                            setState(() {
+                              _currentResponse = null;
+                            });
+                          }
+                        });
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Recognizing your strengths builds confidence!',
+                  style: GoogleFonts.fredoka(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Maybe Later', style: GoogleFonts.fredoka()),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showMentalHealthTools() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder:
+          (context) => Container(
+            padding: const EdgeInsets.all(20),
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Column(
+              children: [
+                Text(
+                  'Wellness Tools',
+                  style: GoogleFonts.fredoka(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Tools to support your mental wellbeing',
+                  style: GoogleFonts.fredoka(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+
+                // Categories
+                Row(
+                  children: [
+                    _buildCategoryTab(
+                      icon: Icons.sentiment_satisfied_alt,
+                      label: 'Mood',
+                      color: Colors.blue,
+                    ),
+                    _buildCategoryTab(
+                      icon: Icons.spa,
+                      label: 'Calm',
+                      color: Colors.green,
+                    ),
+                    _buildCategoryTab(
+                      icon: Icons.psychology,
+                      label: 'Mind',
+                      color: Colors.purple,
+                    ),
+                    _buildCategoryTab(
+                      icon: Icons.favorite,
+                      label: 'Self',
+                      color: Colors.red,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+                Expanded(
+                  child: GridView.count(
+                    crossAxisCount: 3,
+                    childAspectRatio: 0.85,
+                    crossAxisSpacing: 15,
+                    mainAxisSpacing: 15,
+                    children: [
+                      _buildToolButton(
+                        icon: Icons.air,
+                        label: 'Breathing',
+                        color: Colors.blue,
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _startBreathingExercise();
+                        },
+                      ),
+                      _buildToolButton(
+                        icon: Icons.spa,
+                        label: 'Grounding',
+                        color: Colors.green,
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _startGroundingExercise();
+                        },
+                      ),
+                      _buildToolButton(
+                        icon: Icons.psychology,
+                        label: 'Small Win',
+                        color: Colors.purple,
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showSmallActivityPrompt();
+                        },
+                      ),
+                      _buildToolButton(
+                        icon: Icons.beach_access,
+                        label: 'Visualize',
+                        color: Colors.orange,
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _startVisualizationExercise();
+                        },
+                      ),
+                      _buildToolButton(
+                        icon: Icons.schedule,
+                        label: 'Routine',
+                        color: Colors.indigo,
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showRoutineTracker();
+                        },
+                      ),
+                      _buildToolButton(
+                        icon: Icons.favorite,
+                        label: 'Affirmation',
+                        color: Colors.red,
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showAffirmation();
+                        },
+                      ),
+                      _buildToolButton(
+                        icon: Icons.fitness_center,
+                        label: 'Stress Relief',
+                        color: Colors.teal,
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showStressReliefOptions();
+                        },
+                      ),
+                      _buildToolButton(
+                        icon: Icons.star,
+                        label: 'Strengths',
+                        color: Colors.amber,
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showSelfEsteemBuilder();
+                        },
+                      ),
+                      _buildToolButton(
+                        icon: Icons.emoji_events,
+                        label: 'Achievements',
+                        color: Colors.deepOrange,
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showAchievements();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+
+  Widget _buildCategoryTab({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: color, width: 3)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: GoogleFonts.fredoka(
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToolButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(color: Colors.grey.shade300, width: 1),
+          ),
+        ),
+        child: TextButton(
+          onPressed: onPressed,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: GoogleFonts.fredoka(
+                  color: color,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
@@ -637,6 +1346,54 @@ Pick one:
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                // Happiness Coins Counter
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    margin: const EdgeInsets.only(
+                                      bottom: 10,
+                                      left: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade100,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: Colors.amber.shade300,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.monetization_on,
+                                          color: Colors.amber,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          '$_totalHappinessCoins',
+                                          style: GoogleFonts.fredoka(
+                                            color: Colors.amber.shade800,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          'Coins',
+                                          style: GoogleFonts.fredoka(
+                                            color: Colors.amber.shade800,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                                 // Top row of feature buttons
                                 Row(
                                   mainAxisAlignment:
@@ -713,6 +1470,33 @@ Pick one:
                                       color: Colors.purple,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
+                                    SizedBox(
+                                      width: constraints.maxWidth * 0.05,
+                                    ),
+                                    _buildFeatureButton(
+                                      icon: Icons.book,
+                                      label: 'Diary',
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) =>
+                                                    const DiaryScreen(),
+                                          ),
+                                        );
+                                      },
+                                      color: Colors.indigo,
+                                      size: isSmallScreen ? 40 : 50,
+                                    ),
+                                    SizedBox(
+                                      width: constraints.maxWidth * 0.05,
+                                    ),
+                                    _buildFeatureButton(
+                                      icon: Icons.pets,
+                                      label: 'Interact',
+                                      onPressed: _toggleInteractionsPanel,
+                                      color: Colors.purple,
                                     SizedBox(
                                       width: constraints.maxWidth * 0.05,
                                     ),
@@ -1112,6 +1896,10 @@ Pick one:
     );
   }
 
+
+  // Track consecutive negative chat messages
+  int _consecutiveNegativeChats = 0;
+
   // Enhanced mood detection for Gemini integration
   Map<String, dynamic> _detectMoodFromText(String text) {
     final result = {
@@ -1123,6 +1911,8 @@ Pick one:
       'context': <String>[], // Initialize as a proper List<String>
     };
 
+  // Detect mood from a text message
+  Map<String, dynamic> _detectMoodFromText(String text) {
     final lowerText = text.toLowerCase();
 
     // Detect loneliness
@@ -1164,33 +1954,29 @@ Pick one:
       {'pattern': ['health', 'sick', 'pain', 'doctor', 'hospital', 'illness'], 'context': 'health'},
     ];
 
-    // Check for each emotion type
-    for (final keyword in lonelyKeywords) {
-      if (lowerText.contains(keyword)) {
-        result['lonely'] = true;
-        break;
-      }
-    }
+    // Check for emotions in the text
+    final isLonely = lonelyWords.any((word) => lowerText.contains(word));
+    final isSad = sadWords.any((word) => lowerText.contains(word));
+    final isAnxious = anxiousWords.any((word) => lowerText.contains(word));
+    final isAngry = angryWords.any((word) => lowerText.contains(word));
+    final isHappy = happyWords.any((word) => lowerText.contains(word));
 
-    for (final keyword in anxiousKeywords) {
-      if (lowerText.contains(keyword)) {
-        result['anxious'] = true;
-        break;
-      }
-    }
+    // Track consecutive negative messages for potential interventions
+    if (isSad || isAnxious || isAngry || isLonely) {
+      _consecutiveNegativeChats++;
 
-    for (final keyword in sadKeywords) {
-      if (lowerText.contains(keyword)) {
-        result['sad'] = true;
-        break;
+      // If user has had several negative chat messages in a row, consider suggesting help
+      if (_consecutiveNegativeChats >= _negativeThreshold) {
+        // Schedule the help suggestion for after the AI response
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            _showHelpSuggestion();
+          }
+        });
+        _consecutiveNegativeChats = 0; // Reset after showing help
       }
-    }
-
-    for (final keyword in angryKeywords) {
-      if (lowerText.contains(keyword)) {
-        result['angry'] = true;
-        break;
-      }
+    } else if (isHappy) {
+      _consecutiveNegativeChats = 0; // Reset on positive messages
     }
 
     // Detect context
@@ -1204,7 +1990,6 @@ Pick one:
       }
     }
 
-    // Determine overall mood
     if (result['lonely'] == true || result['anxious'] == true || 
         result['sad'] == true || result['angry'] == true) {
       result['mood'] = 'negative';
@@ -1361,10 +2146,145 @@ Pick one:
   }
 
   void _showMoodTracker() {
-    // Instead of showing the mood dialog, navigate to the AttendanceScreen
-    Navigator.push(
-      context, 
-      MaterialPageRoute(builder: (context) => AttendanceScreen()),
+    final moodOptions = [
+      {'emoji': '😊', 'label': 'Happy', 'color': Colors.yellow},
+      {'emoji': '😌', 'label': 'Calm', 'color': Colors.blue.shade300},
+      {'emoji': '😐', 'label': 'Neutral', 'color': Colors.grey.shade400},
+      {'emoji': '😔', 'label': 'Sad', 'color': Colors.indigo.shade300},
+      {'emoji': '😡', 'label': 'Angry', 'color': Colors.red.shade400},
+      {'emoji': '😰', 'label': 'Anxious', 'color': Colors.purple.shade300},
+    ];
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              'How are you feeling today?',
+              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                // Emoji mood selector
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 15,
+                  children:
+                      moodOptions.map((mood) {
+                        return InkWell(
+                          onTap: () async {
+                            // Make async
+                            final attendanceService = AttendanceService();
+
+                            // Mark attendance with mood
+                            final result = await attendanceService
+                                .markAttendanceWithMood(
+                                  mood['label'] as String,
+                                );
+
+                            if (!mounted) return;
+                            Navigator.pop(context);
+
+                            // Record mood and show pet response
+                            _recordMood(mood['label'] as String);
+
+                            if (result.success) {
+                              // Show success message
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(result.message),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+
+                              // If there's a reward, show reward dialog
+                              if (result.reward != null) {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: const Text('🎉 Reward!'),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'You earned: ${result.reward!.name}',
+                                          ),
+                                          Text(
+                                            'Happiness boost: +${result.reward!.happinessBoost}',
+                                            style: const TextStyle(
+                                              color: Colors.green,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          child: Text(
+                                            'Great!',
+                                            style: GoogleFonts.fredoka(),
+                                          ),
+                                          onPressed:
+                                              () => Navigator.pop(context),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              }
+
+                              // Update happiness coins count
+                              _loadHappinessCoins();
+                            }
+                          },
+                          // onTap:
+                          // () {
+                          //   // Record the selected mood
+                          //   _recordMood(mood['label'] as String);
+                          //   Navigator.pop(context);
+                          // };
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: (mood['color'] as Color).withOpacity(
+                                    0.2,
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  mood['emoji'] as String,
+                                  style: const TextStyle(fontSize: 30),
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                mood['label'] as String,
+                                style: GoogleFonts.fredoka(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Maybe Later', style: GoogleFonts.fredoka()),
+              ),
+            ],
+          ),
     );
   }
 
@@ -1415,6 +2335,234 @@ Pick one:
       });
     });
   }
+  // Method to detect user distress and offer help resources
+  void _checkUserDistress(String message, String mood) {
+    // List of high-risk critical keywords that require immediate attention
+    final criticalKeywords = [
+      'suicide',
+      'suicidal',
+      'kill myself',
+      'end my life',
+      'want to die',
+      'die',
+      'death',
+      'don\'t want to live',
+      'end it all',
+      'no reason to live',
+      'better off dead',
+      'can\'t go on',
+      'giving up',
+      'goodbye',
+      'final goodbye',
+    ];
+
+    // List of distress keywords to check for in messages
+    final distressKeywords = [
+      'sad',
+      'depressed',
+      'depression',
+      'anxiety',
+      'anxious',
+      'worried',
+      'stress',
+      'stressed',
+      'overwhelmed',
+      'lonely',
+      'alone',
+      'hopeless',
+      'worthless',
+      'desperate',
+      'miserable',
+      'unhappy',
+      'suffering',
+      'pain',
+      'hurt',
+      'crying',
+      'tears',
+      'broken',
+      'empty',
+      'numb',
+      'tired of',
+      'exhausted',
+      'hate myself',
+    ];
+
+    // List of negative moods from daily check-ins to track
+    final negativeMoods = ['Sad', 'Angry', 'Anxious'];
+
+    // Convert message to lowercase for case-insensitive matching
+    final lowerMessage = message.toLowerCase();
+
+    // First check for critical high-risk keywords - these get immediate response
+    final containsCriticalKeywords = criticalKeywords.any(
+      (keyword) => lowerMessage.contains(keyword),
+    );
+
+    if (containsCriticalKeywords) {
+      // Immediately show help suggestion for critical keywords
+      _showHelpSuggestion(highPriority: true);
+      return; // Exit early, no need to check other conditions
+    }
+
+    // Check for other distress keywords
+    final containsDistressKeywords = distressKeywords.any(
+      (keyword) => lowerMessage.contains(keyword),
+    );
+
+    // Check if current mood is negative
+    final isNegativeMood = negativeMoods.contains(mood);
+
+    // If we detect distress or consistently negative moods, show help suggestion
+    if (containsDistressKeywords || isNegativeMood) {
+      _showHelpSuggestion();
+    }
+  }
+
+  // Keep track of consecutive negative mood check-ins
+  int _consecutiveNegativeMoods = 0;
+  final int _negativeThreshold =
+      3; // Show suggestion after 3 consecutive negative moods
+
+  // Update negative mood counter and check if we should suggest help
+  void _updateMoodTracking(String mood) {
+    final negativeMoods = ['Sad', 'Angry', 'Anxious'];
+
+    if (negativeMoods.contains(mood)) {
+      _consecutiveNegativeMoods++;
+
+      // If user has had several negative moods in a row, suggest help
+      if (_consecutiveNegativeMoods >= _negativeThreshold) {
+        _showHelpSuggestion();
+      }
+    } else {
+      // Reset counter if mood is positive
+      _consecutiveNegativeMoods = 0;
+    }
+  }
+
+  // Show a suggestion to visit help resources
+  void _showHelpSuggestion({bool highPriority = false}) {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible:
+          !highPriority, // Cannot dismiss by tapping outside if high priority
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Icon(
+                    highPriority ? Icons.warning : Icons.pets,
+                    color:
+                        highPriority
+                            ? Colors.red
+                            : Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    highPriority
+                        ? 'Important support message'
+                        : 'A message from your pet',
+                    style: GoogleFonts.fredoka(
+                      fontWeight: FontWeight.bold,
+                      color: highPriority ? Colors.red : null,
+                    ),
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
+                  ),
+                ),
+              ],
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+            contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    highPriority
+                        ? 'Your wellbeing matters. If you\'re thinking about harming yourself, please know that help is available and you are not alone. Let me show you some immediate support resources.'
+                        : 'You seem like you\'re having a tough time. Sometimes talking to someone helps. Would you like me to show you some help resources?',
+                    style: GoogleFonts.fredoka(),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    height: 100,
+                    child: Image.asset(
+                      highPriority
+                          ? 'assets/animations/support_pet.gif'
+                          : 'assets/animations/concerned_pet.gif',
+                      errorBuilder:
+                          (context, error, stackTrace) => Icon(
+                            highPriority ? Icons.support : Icons.pets,
+                            size: 60,
+                            color:
+                                highPriority
+                                    ? Colors.red
+                                    : Theme.of(context).colorScheme.primary,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            actions: [
+              if (!highPriority) // Only show "Not now" for standard priority
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Not now', style: GoogleFonts.fredoka()),
+                ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HelpSupportScreen(),
+                    ),
+                  );
+                },
+                style:
+                    highPriority
+                        ? ElevatedButton.styleFrom(backgroundColor: Colors.red)
+                        : null,
+                child: Text(
+                  highPriority ? 'Get help now' : 'Show resources',
+                  style: GoogleFonts.fredoka(
+                    color: highPriority ? Colors.white : null,
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
+  // Method to be called when processing chat messages
+  void _processChatMessage(String message) {
+    // Pass an empty mood since this is from chat, not check-in
+    _checkUserDistress(message, '');
+  }
+
+  // Load happiness coins from AttendanceService
+  Future<void> _loadHappinessCoins() async {
+    final attendanceService = AttendanceService();
+    final coins = await attendanceService.getTotalCoins();
+    if (mounted) {
+      setState(() {
+        _totalHappinessCoins = coins;
+      });
+    }
+  }
+
 }
 
 class BubbleTrianglePainter extends CustomPainter {

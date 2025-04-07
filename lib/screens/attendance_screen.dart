@@ -17,19 +17,20 @@ class AttendanceScreen extends StatefulWidget {
 class _AttendanceScreenState extends State<AttendanceScreen>
     with SingleTickerProviderStateMixin {
   final AttendanceService _attendanceService = AttendanceService();
-  final EmotionService _emotionService = EmotionService();
-  List<DateTime> _attendanceDates = [];
+
+  List<Map<String, dynamic>> _attendanceDatesWithMoods = [];
+
   DateTime? _selectedDate;
   bool _isLoading = true;
   int _streak = 0;
+  int _totalCoins = 0;
   bool _checkedInToday = false;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   AttendanceReward? _lastReward;
   bool _showRewardAnimation = false;
-  List<Map<String, dynamic>> _emotionHistory = [];
-  String _timeRange = 'Week'; // 'Week', 'Month', 'Year'
-  bool _loadingEmotions = false;
+
+  int _earnedCoins = 0;
 
   @override
   void initState() {
@@ -57,14 +58,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     });
 
     try {
-      final dates = await _attendanceService.getAttendanceDates();
+      final datesWithMoods =
+          await _attendanceService.getAttendanceDatesWithMoods();
       final streak = await _attendanceService.getStreak();
       final checkedIn = await _attendanceService.hasCheckedInToday();
+      final totalCoins = await _attendanceService.getTotalCoins();
 
       setState(() {
-        _attendanceDates = dates;
+        _attendanceDatesWithMoods = datesWithMoods;
         _streak = streak;
         _checkedInToday = checkedIn;
+        _totalCoins = totalCoins;
         _isLoading = false;
       });
     } catch (e) {
@@ -75,173 +79,42 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
   }
 
-  Future<void> _loadEmotionHistory() async {
-    setState(() {
-      _loadingEmotions = true;
-    });
-
-    try {
-      // Get date range based on selected time range
-      int daysToLoad;
-      switch (_timeRange) {
-        case 'Week':
-          daysToLoad = 7;
-          break;
-        case 'Month':
-          daysToLoad = 30;
-          break;
-        case 'Year':
-          daysToLoad = 365;
-          break;
-        default:
-          daysToLoad = 7;
-      }
-      
-      // Load emotion data using EmotionService
-      final emotions = await _emotionService.getEmotions(days: daysToLoad);
-      
-      setState(() {
-        _emotionHistory = emotions;
-        _loadingEmotions = false;
-      });
-    } catch (e) {
-      print('Error loading emotion history: $e');
-      setState(() {
-        _loadingEmotions = false;
-      });
-    }
-  }
-  
   final moodOptions = [
-      {'emoji': '😊', 'label': 'Happy', 'color': Colors.yellow},
-      {'emoji': '😌', 'label': 'Calm', 'color': Colors.blue.shade300},
-      {'emoji': '😐', 'label': 'Neutral', 'color': Colors.grey.shade400},
-      {'emoji': '😔', 'label': 'Sad', 'color': Colors.indigo.shade300},
-      {'emoji': '😡', 'label': 'Angry', 'color': Colors.red.shade400},
-      {'emoji': '😰', 'label': 'Anxious', 'color': Colors.purple.shade300},
-    ];
+    {'emoji': '😊', 'label': 'Happy', 'color': Colors.yellow},
+    {'emoji': '😌', 'label': 'Calm', 'color': Colors.blue.shade300},
+    {'emoji': '😐', 'label': 'Neutral', 'color': Colors.grey.shade400},
+    {'emoji': '😔', 'label': 'Sad', 'color': Colors.indigo.shade300},
+    {'emoji': '😡', 'label': 'Angry', 'color': Colors.red.shade400},
+    {'emoji': '😰', 'label': 'Anxious', 'color': Colors.purple.shade300},
+  ];
 
   Future<void> _handleCheckIn() async {
-    // Show mood selection dialog instead of using default mood
-    String? selectedMood;
-    String? noteText;
-    
-    final result = await showDialog<Map<String, String?>>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Text(
-            'How are you feeling today?',
-            style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 10),
-              // Emoji mood selector
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 15,
-                children: moodOptions.map((mood) {
-                  final isSelected = selectedMood == mood['label'];
-                  return InkWell(
-                    onTap: () {
-                      setState(() {
-                        selectedMood = mood['label'] as String;
-                      });
-                    },
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: (mood['color'] as Color).withOpacity(isSelected ? 0.6 : 0.2),
-                            shape: BoxShape.circle,
-                            border: isSelected 
-                              ? Border.all(color: Colors.black, width: 2) 
-                              : null,
-                          ),
-                          child: Text(
-                            mood['emoji'] as String,
-                            style: const TextStyle(fontSize: 30),
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          mood['label'] as String,
-                          style: GoogleFonts.fredoka(
-                            fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-              // Optional note field
-              TextField(
-                decoration: InputDecoration(
-                  hintText: 'Add a note about how you\'re feeling (optional)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
-                maxLines: 2,
-                textAlign: TextAlign.center,
-                onChanged: (value) {
-                  noteText = value;
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel', style: GoogleFonts.fredoka()),
-            ),
-            ElevatedButton(
-              onPressed: selectedMood == null ? null : () {
-                Navigator.of(context).pop({
-                  'mood': selectedMood,
-                  'note': noteText,
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey.shade300,
-              ),
-              child: Text('Check In', style: GoogleFonts.fredoka()),
-            ),
-          ],
-        ),
-      ),
+    // Show mood selection dialog
+    final selectedMood = await _showMoodSelectionDialog();
+    if (selectedMood == null) return; // User cancelled
+
+    final result = await _attendanceService.markAttendanceWithMood(
+      selectedMood,
     );
 
-    if (result != null && result['mood'] != null) {
-      final checkInResult = await _attendanceService.checkInWithEmotionTracking(
-        result['mood']!,
-        note: result['note'],
-      );
+    if (result.success) {
+      // Calculate earned coins in this check-in
+      final int prevCoins = _totalCoins;
+      final int newCoins = result.totalCoins;
+      final int earned = newCoins - prevCoins;
 
-      if (checkInResult.success) {
-        setState(() {
-          _lastReward = checkInResult.reward;
-          _showRewardAnimation = true;
-          _streak = checkInResult.streak;
-          _checkedInToday = true;
-        });
+      setState(() {
+        _lastReward = result.reward;
+        _showRewardAnimation = true;
+        _streak = result.streak;
+        _checkedInToday = true;
+        _totalCoins = result.totalCoins;
+        _earnedCoins = earned;
+      });
+
+      // Reload data to get the updated mood data
+      _loadAttendanceData();
+
 
         // Add today to attendance dates
         final today = DateTime.now();
@@ -276,6 +149,70 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
   }
 
+  // Show dialog to select mood
+  Future<String?> _showMoodSelectionDialog() async {
+    return showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              'How are you feeling today?',
+              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Select your mood:', style: GoogleFonts.fredoka()),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    alignment: WrapAlignment.center,
+                    children:
+                        moodOptions.map((option) {
+                          return InkWell(
+                            onTap:
+                                () => Navigator.of(
+                                  context,
+                                ).pop(option['label'] as String),
+                            child: Column(
+                              children: [
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: (option['color'] as Color)
+                                        .withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  padding: const EdgeInsets.all(10),
+                                  child: Text(
+                                    option['emoji'] as String,
+                                    style: const TextStyle(fontSize: 30),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  option['label'] as String,
+                                  style: GoogleFonts.fredoka(),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('Cancel', style: GoogleFonts.fredoka()),
+              ),
+            ],
+          ),
+    );
+  }
+
   void _onDateSelected(DateTime date) {
     setState(() {
       _selectedDate = date;
@@ -284,53 +221,47 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text('Daily Attendance', style: GoogleFonts.fredoka()),
-          bottom: TabBar(
-            tabs: [
-              Tab(text: 'Attendance', icon: Icon(Icons.calendar_today)),
-              Tab(text: 'Mood History', icon: Icon(Icons.emoji_emotions)),
-            ],
-          ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Daily Attendance',
+          style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
         ),
-        body: _isLoading || _loadingEmotions
-            ? const Center(child: CircularProgressIndicator())
-            : TabBarView(
+      ),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Stack(
                 children: [
-                  // Attendance Tab
-                  Stack(
-                    children: [
-                      SingleChildScrollView(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildStreakInfo(),
-                              const SizedBox(height: 16),
-                              Card(
-                                elevation: 4,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Column(
-                                    children: [
-                                      const Text(
-                                        'Attendance Calendar',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      AttendanceCalendar(
-                                        markedDates: _attendanceDates,
-                                        selectedDate: _selectedDate,
-                                        onDaySelected: _onDateSelected,
-                                      ),
-                                    ],
+                  SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildCoinCounter(),
+                          const SizedBox(height: 16),
+                          _buildStreakInfo(),
+                          const SizedBox(height: 16),
+                          Card(
+                            elevation: 4,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'Attendance Calendar',
+                                    style: GoogleFonts.fredoka(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  AttendanceCalendar(
+                                    markedDatesWithMoods:
+                                        _attendanceDatesWithMoods,
+                                    selectedDate: _selectedDate,
+                                    onDaySelected: _onDateSelected,
                                   ),
                                 ),
                               ),
@@ -390,6 +321,122 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
   }
 
+  Widget _buildCoinCounter() {
+    return Card(
+      color: Colors.amber.shade300,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.monetization_on,
+                  color: Colors.amber.shade800,
+                  size: 32,
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Happiness Coins',
+                      style: GoogleFonts.fredoka(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      '$_totalCoins coins',
+                      style: GoogleFonts.fredoka(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber.shade900,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.info_outline, color: Colors.black54),
+              onPressed: () {
+                _showCoinInfoDialog();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCoinInfoDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.monetization_on, color: Colors.amber.shade600),
+                const SizedBox(width: 8),
+                Text('Happiness Coins', style: GoogleFonts.fredoka()),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Happiness Coins are earned through daily check-ins:',
+                  style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                _buildCoinInfoItem('Daily Check-in', '+10 coins'),
+                _buildCoinInfoItem('Weekly Streak (7 days)', '+20 coins'),
+                _buildCoinInfoItem('Monthly Streak (30 days)', '+50 coins'),
+                const SizedBox(height: 12),
+                Text(
+                  'These coins reflect your pet\'s happiness level and can be used to unlock special features in the future!',
+                  style: GoogleFonts.fredoka(
+                    fontStyle: FontStyle.italic,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Got it', style: GoogleFonts.fredoka()),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildCoinInfoItem(String title, String reward) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: GoogleFonts.fredoka()),
+          Text(
+            reward,
+            style: GoogleFonts.fredoka(
+              color: Colors.amber.shade800,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStreakInfo() {
     final theme = Theme.of(context);
     return Card(
@@ -409,9 +456,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 const SizedBox(width: 8),
                 Text(
                   'Current Streak',
-                  style: theme.textTheme.titleLarge?.copyWith(
+                  style: GoogleFonts.fredoka(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
+                    fontSize: theme.textTheme.titleLarge?.fontSize,
                   ),
                 ),
               ],
@@ -419,9 +467,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             const SizedBox(height: 8),
             Text(
               '$_streak days',
-              style: theme.textTheme.headlineMedium?.copyWith(
+              style: GoogleFonts.fredoka(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
+                fontSize: theme.textTheme.headlineMedium?.fontSize,
               ),
             ),
             if (_streak > 0)
@@ -433,8 +482,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       : _streak >= 7
                       ? 'Amazing dedication!'
                       : 'Great job!',
-                  style: theme.textTheme.bodyLarge?.copyWith(
+                  style: GoogleFonts.fredoka(
                     color: Colors.white,
+                    fontSize: theme.textTheme.bodyLarge?.fontSize,
                   ),
                 ),
               ),
@@ -450,7 +500,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       icon: Icon(_checkedInToday ? Icons.check_circle : Icons.pets),
       label: Text(
         _checkedInToday ? 'Already Checked In Today' : 'Check In Now',
-        style: const TextStyle(fontSize: 16),
+        style: GoogleFonts.fredoka(fontSize: 16),
       ),
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -467,9 +517,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Attendance Rewards',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: GoogleFonts.fredoka(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 16),
             _buildRewardItem(
@@ -523,12 +576,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: GoogleFonts.fredoka(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
                 ),
-                Text(description, style: TextStyle(color: Colors.grey[600])),
+                Text(
+                  description,
+                  style: GoogleFonts.fredoka(color: Colors.grey[600]),
+                ),
               ],
             ),
           ),
@@ -572,22 +628,41 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Reward Earned!',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style: GoogleFonts.fredoka(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 _lastReward!.name,
-                style: const TextStyle(
+                style: GoogleFonts.fredoka(
                   fontSize: 18,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(height: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.monetization_on, color: Colors.amber.shade600),
+                  const SizedBox(width: 4),
+                  Text(
+                    '+$_earnedCoins coins',
+                    style: GoogleFonts.fredoka(
+                      fontSize: 18,
+                      color: Colors.amber.shade800,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
               Text(
-                '+${_lastReward!.happinessBoost} Happiness',
-                style: const TextStyle(
+                '+${_lastReward!.happinessBoost} happiness',
+                style: GoogleFonts.fredoka(
                   fontSize: 16,
                   color: Colors.green,
                   fontWeight: FontWeight.bold,

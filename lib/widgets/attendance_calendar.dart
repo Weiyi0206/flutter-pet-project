@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class AttendanceCalendar extends StatefulWidget {
-  final List<DateTime> markedDates;
+  final List<Map<String, dynamic>> markedDatesWithMoods;
   final Function(DateTime)? onDaySelected;
   final DateTime? selectedDate;
 
   const AttendanceCalendar({
     super.key,
-    required this.markedDates,
+    required this.markedDatesWithMoods,
     this.onDaySelected,
     this.selectedDate,
   });
@@ -109,6 +109,32 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
     );
   }
 
+  // Helper method to find mood for a specific date
+  String? _getMoodEmojiForDate(DateTime date) {
+    final formattedDate = DateFormat('yyyy-MM-dd').format(date);
+
+    for (var markedDate in widget.markedDatesWithMoods) {
+      final markedDateTime = markedDate['date'] as DateTime;
+      if (DateFormat('yyyy-MM-dd').format(markedDateTime) == formattedDate) {
+        return markedDate['moodEmoji'] as String?;
+      }
+    }
+    return null;
+  }
+
+  // Check if date is marked
+  bool _isDateMarked(DateTime date) {
+    final formattedDate = DateFormat('yyyy-MM-dd').format(date);
+
+    for (var markedDate in widget.markedDatesWithMoods) {
+      final markedDateTime = markedDate['date'] as DateTime;
+      if (DateFormat('yyyy-MM-dd').format(markedDateTime) == formattedDate) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Widget _buildCalendarGrid(BuildContext context) {
     final theme = Theme.of(context);
     final daysInMonth =
@@ -133,12 +159,8 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
 
       final day = index - firstWeekdayOfMonth + 1;
       final date = DateTime(_currentMonth.year, _currentMonth.month, day);
-      final isMarked = widget.markedDates.any(
-        (markedDate) =>
-            markedDate.year == date.year &&
-            markedDate.month == date.month &&
-            markedDate.day == date.day,
-      );
+      final isMarked = _isDateMarked(date);
+      final moodEmoji = _getMoodEmojiForDate(date);
 
       final isSelected =
           widget.selectedDate != null &&
@@ -185,30 +207,24 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
                   ? Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Semi-transparent background is already handled by the Container decoration
-                      // Add a small check icon above the date
-                      Positioned(
-                        top: 2,
-                        child: Icon(
-                          Icons.check,
-                          color:
-                              isSelected
-                                  ? Colors.white
-                                  : theme.colorScheme.primary,
-                          size: 12, // Smaller icon
+                      // Date number stays centered and slightly smaller
+                      Text(
+                        day.toString(),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: isSelected ? Colors.white : null,
+                          fontWeight: isCurrentDay ? FontWeight.bold : null,
+                          fontSize: 10, // Smaller to make room for the emoji
                         ),
                       ),
-                      // The date number below the check
-                      Positioned(
-                        bottom: 2,
-                        child: Text(
-                          day.toString(),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: isSelected ? Colors.white : null,
-                            fontWeight: isCurrentDay ? FontWeight.bold : null,
+                      // Show mood emoji on top of the date
+                      if (moodEmoji != null)
+                        Positioned(
+                          bottom: 2,
+                          child: Text(
+                            moodEmoji,
+                            style: const TextStyle(fontSize: 12),
                           ),
                         ),
-                      ),
                     ],
                   )
                   : Center(

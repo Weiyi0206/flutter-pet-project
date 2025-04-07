@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:helloworld/services/places_service.dart';
 import 'package:helloworld/services/helpdata_service.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class HelpSupportScreen extends StatefulWidget {
   const HelpSupportScreen({super.key});
@@ -233,27 +234,67 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   void _showHospitalDetails(Place hospital) {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.purple.shade50,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder:
           (context) => Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  hospital.name,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Address: ${hospital.vicinity ?? hospital.formattedAddress ?? 'N/A'}',
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.local_hospital,
+                        color: Colors.red.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        hospital.name,
+                        style: GoogleFonts.fredoka(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.location_on, size: 16, color: Colors.black54),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Address: ${hospital.vicinity ?? hospital.formattedAddress ?? 'N/A'}',
+                          style: GoogleFonts.fredoka(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     ElevatedButton.icon(
                       onPressed: () {
@@ -270,7 +311,18 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                         }
                       },
                       icon: const Icon(Icons.location_on),
-                      label: const Text('Show on Map'),
+                      label: Text('Show on Map', style: GoogleFonts.fredoka()),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple.shade100,
+                        foregroundColor: Colors.purple.shade800,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -286,8 +338,14 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Help & Support'),
-          bottom: const TabBar(
+          title: Text(
+            'Help & Support',
+            style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: const Color.fromARGB(255, 238, 210, 243),
+          bottom: TabBar(
+            labelStyle: GoogleFonts.fredoka(),
+            indicatorColor: Colors.purple.shade800,
             tabs: [
               Tab(icon: Icon(Icons.phone), text: 'Helplines'),
               Tab(icon: Icon(Icons.psychology), text: 'Counseling'),
@@ -308,7 +366,9 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
   Widget _buildHelplineList() {
     if (_isLoadingData) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.purple),
+      );
     }
 
     if (helplines.isEmpty) {
@@ -316,160 +376,298 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text("No helplines available"),
-            ElevatedButton(onPressed: _loadData, child: Text("Retry")),
+            Text(
+              "No helplines available",
+              style: GoogleFonts.fredoka(fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple.shade100,
+                foregroundColor: Colors.purple.shade800,
+              ),
+              child: Text("Retry", style: GoogleFonts.fredoka()),
+            ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      itemCount: helplines.length,
-      itemBuilder: (context, index) {
-        final helpline = helplines[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  helpline['name'] ?? '',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Description
-                if (helpline['description'] != null &&
-                    helpline['description']!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Text(
-                      helpline['description'] ?? '',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
-                  ),
-
-                // Phone number
-                Row(
-                  children: [
-                    const Icon(Icons.phone, size: 16),
-                    const SizedBox(width: 4),
-                    Text(helpline['number'] ?? ''),
-                  ],
-                ),
-
-                // Email
-                if (helpline['email'] != null && helpline['email']!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.email, size: 16),
-                        const SizedBox(width: 4),
-                        GestureDetector(
-                          onTap:
-                              () => launchUrl(
-                                Uri.parse('mailto:${helpline['email']}'),
-                              ),
-                          child: Text(
-                            helpline['email'] ?? '',
-                            style: TextStyle(
-                              color: Colors.blue,
-                              decoration: TextDecoration.underline,
-                            ),
+    return Container(
+      color: Colors.purple.shade50.withOpacity(0.3),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: helplines.length,
+        itemBuilder: (context, index) {
+          final helpline = helplines[index];
+          return Card(
+            margin: const EdgeInsets.only(bottom: 16),
+            elevation: 3,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            color: Colors.purple.shade50,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.support_agent,
+                          color: Colors.purple.shade700,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          helpline['name'] ?? '',
+                          style: GoogleFonts.fredoka(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 12),
 
-                // Working hours
-                if (helpline['working_hours'] != null &&
-                    helpline['working_hours']!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
-                    child: Row(
+                  // Description
+                  if (helpline['description'] != null &&
+                      helpline['description']!.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.purple.shade100),
+                      ),
+                      child: Text(
+                        helpline['description'] ?? '',
+                        style: GoogleFonts.fredoka(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  // Contact Information section
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.access_time, size: 16),
-                        const SizedBox(width: 4),
-                        Text(helpline['working_hours'] ?? ''),
-                      ],
-                    ),
-                  ),
-
-                // Show website if available
-                if (helpline['website'] != null &&
-                    helpline['website']!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
-                    child: GestureDetector(
-                      onTap: () => _launchUrl(helpline['website']!),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.language,
-                            size: 16,
-                            color: Colors.blue,
+                        Text(
+                          'Contact Information',
+                          style: GoogleFonts.fredoka(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Visit Website',
-                            style: TextStyle(
-                              color: Colors.blue,
-                              decoration: TextDecoration.underline,
+                        ),
+                        const Divider(),
+                        const SizedBox(height: 8),
+
+                        // Phone number
+                        Row(
+                          children: [
+                            Icon(Icons.phone, size: 16, color: Colors.black54),
+                            const SizedBox(width: 8),
+                            Text(
+                              helpline['number'] ?? '',
+                              style: GoogleFonts.fredoka(),
+                            ),
+                          ],
+                        ),
+
+                        // Email
+                        if (helpline['email'] != null &&
+                            helpline['email']!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.email,
+                                  size: 16,
+                                  color: Colors.black54,
+                                ),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap:
+                                      () => launchUrl(
+                                        Uri.parse(
+                                          'mailto:${helpline['email']}',
+                                        ),
+                                      ),
+                                  child: Text(
+                                    helpline['email'] ?? '',
+                                    style: GoogleFonts.fredoka(
+                                      color: Colors.blue,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+
+                        // Working hours
+                        if (helpline['working_hours'] != null &&
+                            helpline['working_hours']!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.access_time,
+                                  size: 16,
+                                  color: Colors.black54,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  helpline['working_hours'] ?? '',
+                                  style: GoogleFonts.fredoka(),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // Show website if available
+                        if (helpline['website'] != null &&
+                            helpline['website']!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: GestureDetector(
+                              onTap: () => _launchUrl(helpline['website']!),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.language,
+                                    size: 16,
+                                    color: Colors.black54,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Visit Website',
+                                    style: GoogleFonts.fredoka(
+                                      color: Colors.blue,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
 
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    // Call button
-                    IconButton(
-                      icon: const Icon(Icons.phone),
-                      color: Colors.green,
-                      onPressed: () {
-                        launchUrl(Uri.parse('tel:${helpline['number']}'));
-                      },
-                    ),
+                  const SizedBox(height: 16),
 
-                    // Email button
-                    if (helpline['email'] != null &&
-                        helpline['email']!.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.email),
-                        color: Colors.blue,
+                  // Action buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      // Call button
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.phone, size: 16),
+                        label: Text(
+                          'Call',
+                          style: GoogleFonts.fredoka(fontSize: 12),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade100,
+                          foregroundColor: Colors.green.shade700,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
                         onPressed: () {
-                          launchUrl(Uri.parse('mailto:${helpline['email']}'));
+                          launchUrl(Uri.parse('tel:${helpline['number']}'));
                         },
                       ),
 
-                    // WhatsApp button
-                    if (helpline['whatsapp'] != null &&
-                        helpline['whatsapp']!.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.message),
-                        color: Colors.green,
-                        onPressed: () {
-                          _openWhatsApp(helpline['whatsapp']!);
-                        },
-                      ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 4),
+
+                      // Email button
+                      if (helpline['email'] != null &&
+                          helpline['email']!.isNotEmpty)
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.email, size: 16),
+                          label: Text(
+                            'Email',
+                            style: GoogleFonts.fredoka(fontSize: 12),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade100,
+                            foregroundColor: Colors.blue.shade700,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          onPressed: () {
+                            launchUrl(Uri.parse('mailto:${helpline['email']}'));
+                          },
+                        ),
+
+                      const SizedBox(width: 4),
+
+                      // WhatsApp button back on the same line
+                      if (helpline['whatsapp'] != null &&
+                          helpline['whatsapp']!.isNotEmpty)
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.message, size: 16),
+                          label: Text(
+                            'Whatsapp',
+                            style: GoogleFonts.fredoka(fontSize: 12),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade100,
+                            foregroundColor: Colors.green.shade700,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          onPressed: () {
+                            _openWhatsApp(helpline['whatsapp']!);
+                          },
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -580,7 +778,9 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
   Widget _buildCounselingList() {
     if (_isLoadingData) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.purple),
+      );
     }
 
     if (counselingCenters.isEmpty) {
@@ -588,170 +788,299 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text("No counseling centers available"),
-            ElevatedButton(onPressed: _loadData, child: Text("Retry")),
+            Text(
+              "No counseling centers available",
+              style: GoogleFonts.fredoka(fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple.shade100,
+                foregroundColor: Colors.purple.shade800,
+              ),
+              child: Text("Retry", style: GoogleFonts.fredoka()),
+            ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      itemCount: counselingCenters.length,
-      itemBuilder: (context, index) {
-        final center = counselingCenters[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  center['name'] ?? '',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Description
-                if (center['description'] != null &&
-                    center['description']!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Text(
-                      center['description'] ?? '',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
-                  ),
-
-                // Address
-                if (center['address'] != null && center['address']!.isNotEmpty)
+    return Container(
+      color: Colors.purple.shade50.withOpacity(0.3),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: counselingCenters.length,
+        itemBuilder: (context, index) {
+          final center = counselingCenters[index];
+          return Card(
+            margin: const EdgeInsets.only(bottom: 16),
+            elevation: 3,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            color: Colors.purple.shade50,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Row(
                     children: [
-                      const Icon(Icons.location_on, size: 16),
-                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.psychology,
+                          color: Colors.purple.shade700,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: Text('Address: ${center['address'] ?? ''}'),
+                        child: Text(
+                          center['name'] ?? '',
+                          style: GoogleFonts.fredoka(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
 
-                const SizedBox(height: 4),
+                  // Description
+                  if (center['description'] != null &&
+                      center['description']!.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.purple.shade100),
+                      ),
+                      child: Text(
+                        center['description'] ?? '',
+                        style: GoogleFonts.fredoka(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
 
-                // Phone number
-                Row(
-                  children: [
-                    const Icon(Icons.phone, size: 16),
-                    const SizedBox(width: 4),
-                    Text('Phone: ${center['phone'] ?? ''}'),
-                  ],
-                ),
+                  const SizedBox(height: 16),
 
-                // Email
-                if (center['email'] != null && center['email']!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
-                    child: Row(
+                  // Contact Information section
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.email, size: 16),
-                        const SizedBox(width: 4),
-                        GestureDetector(
-                          onTap:
-                              () => launchUrl(
-                                Uri.parse('mailto:${center['email']}'),
-                              ),
-                          child: Text(
-                            center['email'] ?? '',
-                            style: TextStyle(
-                              color: Colors.blue,
-                              decoration: TextDecoration.underline,
-                            ),
+                        Text(
+                          'Contact Information',
+                          style: GoogleFonts.fredoka(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
                           ),
                         ),
+                        const Divider(),
+                        const SizedBox(height: 8),
+
+                        // Address
+                        if (center['address'] != null &&
+                            center['address']!.isNotEmpty)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 16,
+                                color: Colors.black54,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Address: ${center['address'] ?? ''}',
+                                  style: GoogleFonts.fredoka(),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                        const SizedBox(height: 8),
+
+                        // Phone number
+                        Row(
+                          children: [
+                            Icon(Icons.phone, size: 16, color: Colors.black54),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Phone: ${center['phone'] ?? ''}',
+                              style: GoogleFonts.fredoka(),
+                            ),
+                          ],
+                        ),
+
+                        // Email
+                        if (center['email'] != null &&
+                            center['email']!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.email,
+                                  size: 16,
+                                  color: Colors.black54,
+                                ),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap:
+                                      () => launchUrl(
+                                        Uri.parse('mailto:${center['email']}'),
+                                      ),
+                                  child: Text(
+                                    center['email'] ?? '',
+                                    style: GoogleFonts.fredoka(
+                                      color: Colors.blue,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // Show website if available
+                        if (center['website'] != null &&
+                            center['website']!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: GestureDetector(
+                              onTap: () => _launchUrl(center['website']!),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.language,
+                                    size: 16,
+                                    color: Colors.black54,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Visit Website',
+                                    style: GoogleFonts.fredoka(
+                                      color: Colors.blue,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
 
-                // Show website if available
-                if (center['website'] != null && center['website']!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
-                    child: GestureDetector(
-                      onTap: () => _launchUrl(center['website']!),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.language,
-                            size: 16,
-                            color: Colors.blue,
+                  const SizedBox(height: 16),
+
+                  // Action buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      // Call button
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.phone, size: 18),
+                        label: Text(
+                          'Call',
+                          style: GoogleFonts.fredoka(fontSize: 14),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade100,
+                          foregroundColor: Colors.green.shade700,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Visit Website',
-                            style: TextStyle(
-                              color: Colors.blue,
-                              decoration: TextDecoration.underline,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                        onPressed: () {
+                          launchUrl(Uri.parse('tel:${center['phone']}'));
+                        },
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      // Email button
+                      if (center['email'] != null &&
+                          center['email']!.isNotEmpty)
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.email, size: 18),
+                          label: Text(
+                            'Email',
+                            style: GoogleFonts.fredoka(fontSize: 14),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade100,
+                            foregroundColor: Colors.blue.shade700,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
                             ),
                           ),
-                        ],
+                          onPressed: () {
+                            launchUrl(Uri.parse('mailto:${center['email']}'));
+                          },
+                        ),
+
+                      const SizedBox(width: 8),
+
+                      // Map button
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.map, size: 18),
+                        label: Text(
+                          'Map',
+                          style: GoogleFonts.fredoka(fontSize: 14),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade100,
+                          foregroundColor: Colors.blue.shade700,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                        onPressed: () {
+                          _openInMaps(
+                            center['name'] ?? '',
+                            center['address'] ?? '',
+                          );
+                        },
                       ),
-                    ),
+                    ],
                   ),
-
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    // Call button
-                    IconButton(
-                      icon: const Icon(Icons.phone),
-                      color: Colors.green,
-                      onPressed: () {
-                        launchUrl(Uri.parse('tel:${center['phone']}'));
-                      },
-                    ),
-
-                    // Email button
-                    if (center['email'] != null && center['email']!.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.email),
-                        color: Colors.blue,
-                        onPressed: () {
-                          launchUrl(Uri.parse('mailto:${center['email']}'));
-                        },
-                      ),
-
-                    // WhatsApp button
-                    if (center['whatsapp'] != null &&
-                        center['whatsapp']!.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.message),
-                        color: Colors.green,
-                        onPressed: () {
-                          _openWhatsApp(center['whatsapp']!);
-                        },
-                      ),
-
-                    // Map button
-                    IconButton(
-                      icon: const Icon(Icons.map),
-                      color: Colors.blue,
-                      onPressed: () {
-                        _openInMaps(
-                          center['name'] ?? '',
-                          center['address'] ?? '',
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -789,7 +1118,9 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
   Widget _buildHospitalsMap() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.purple),
+      );
     }
 
     if (_error != null) {
@@ -797,10 +1128,18 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Error: $_error', style: const TextStyle(color: Colors.red)),
+            Text(
+              'Error: $_error',
+              style: GoogleFonts.fredoka(color: Colors.red, fontSize: 16),
+            ),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _getCurrentLocation,
-              child: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple.shade100,
+                foregroundColor: Colors.purple.shade800,
+              ),
+              child: Text("Retry", style: GoogleFonts.fredoka()),
             ),
           ],
         ),
@@ -869,36 +1208,98 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
         ),
         if (nearbyHospitals.isNotEmpty)
           Container(
-            height: 120,
-            color: Colors.white,
+            height: 150,
+            color: Colors.purple.shade100,
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: nearbyHospitals.length,
               itemBuilder: (context, index) {
                 final hospital = nearbyHospitals[index];
                 return Card(
-                  margin: const EdgeInsets.all(8),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  color: Colors.white,
                   child: Container(
-                    width: 200,
-                    padding: const EdgeInsets.all(8),
+                    width: 240,
+                    padding: const EdgeInsets.all(10),
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          hospital.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.local_hospital,
+                              color: Colors.red.shade600,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                hospital.name,
+                                style: GoogleFonts.fredoka(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: const Color.fromARGB(255, 0, 0, 0),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           hospital.vicinity ??
                               hospital.formattedAddress ??
                               'N/A',
+                          style: GoogleFonts.fredoka(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
                           overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
                         ),
-                        TextButton.icon(
-                          onPressed: () => _showHospitalDetails(hospital),
-                          icon: const Icon(Icons.info),
-                          label: const Text('Details'),
+                        const Spacer(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () => _showHospitalDetails(hospital),
+                              icon: const Icon(Icons.info_outline, size: 14),
+                              label: Text(
+                                'Details',
+                                style: GoogleFonts.fredoka(fontSize: 12),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color.fromARGB(
+                                  255,
+                                  226,
+                                  172,
+                                  235,
+                                ),
+                                foregroundColor: const Color.fromARGB(
+                                  255,
+                                  42,
+                                  20,
+                                  68,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 4,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
