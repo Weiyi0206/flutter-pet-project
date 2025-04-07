@@ -154,6 +154,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
   int _totalHappinessCoins = 0; // Keep variable for display
 
+  // --- Define Cooldown Duration ---
+  static const Duration _interactionCooldown = Duration(minutes: 1); // Example: 1 minute cooldown
+
+  // --- Cooldown State ---
+  final Map<String, Timer> _cooldownTimers = {}; // Store active timers
+  final Map<String, Duration> _remainingCooldowns = {}; // Store remaining durations for display
+
   @override
   void initState() {
     super.initState();
@@ -195,12 +202,20 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       }
     });
+
+    // Start timers for any existing cooldowns after initial load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+       _updateAllCooldownTimers();
+    });
   }
 
   @override
   void dispose() {
     _tipTimer?.cancel();
     _chatController.dispose();
+    // --- Cancel all active cooldown timers ---
+    _cooldownTimers.forEach((key, timer) => timer.cancel());
+    _cooldownTimers.clear();
     super.dispose();
   }
 
@@ -260,8 +275,46 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  // Call _updatePetStatsFromData after loading data in interaction methods
+  // --- Helper to check cooldown ---
+  bool _isOnCooldown(String interactionType) {
+    final lastInteraction = _petData['lastInteractionTimes']?[interactionType];
+    if (lastInteraction is DateTime) { // Check if it's a DateTime object
+      final now = DateTime.now();
+      final difference = now.difference(lastInteraction);
+      print("Cooldown check for '$interactionType': Last interaction was $difference ago.");
+      return difference < _interactionCooldown;
+    }
+    return false; // Not on cooldown if no last interaction time found
+  }
+
+  // --- Helper to show cooldown message ---
+  void _showCooldownMessage(String actionName) {
+     if (!mounted) return;
+     final lastInteraction = _petData['lastInteractionTimes']?[actionName.toLowerCase()];
+     String message = '$actionName is on cooldown.';
+     if (lastInteraction is DateTime) {
+        final timeRemaining = _interactionCooldown - DateTime.now().difference(lastInteraction);
+        if (timeRemaining.inSeconds > 0) {
+           message = '$actionName is resting. Try again in ${timeRemaining.inSeconds} seconds.';
+        }
+     }
+     ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+           content: Text(message),
+           duration: const Duration(seconds: 2),
+           backgroundColor: Colors.orange.shade700,
+        ),
+     );
+  }
+
+  // --- Update Interaction Methods ---
+
   void _petThePet() async {
+    // Cooldown check already handled by button state, but keep for safety
+    if (_getRemainingCooldown('pet') > Duration.zero) {
+      _showCooldownMessage('Petting');
+      return;
+    }
     print('[_petThePet] Button pressed.');
     try {
       await _petModel.petPet();
@@ -269,7 +322,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _petData = await _petModel.loadPetData();
       print('[_petThePet] _petModel.loadPetData() completed.');
       _updatePetStatsFromData();
-      // --- No coin awarding here ---
+      _updateCooldownTimer('pet'); // Update timer after action
     } catch (e) {
       print('Error petting pet: $e');
       if (mounted) { // Show error to user
@@ -281,6 +334,10 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _feedThePet() async {
+    if (_getRemainingCooldown('feed') > Duration.zero) {
+      _showCooldownMessage('Feeding');
+      return;
+    }
     print('[_feedThePet] Button pressed.');
     try {
       await _petModel.feedPet();
@@ -288,7 +345,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _petData = await _petModel.loadPetData();
       print('[_feedThePet] _petModel.loadPetData() completed.');
       _updatePetStatsFromData();
-       // --- No coin awarding here ---
+      _updateCooldownTimer('feed'); // Update timer after action
     } catch (e) {
       print('Error feeding pet: $e');
        if (mounted) { // Show error to user
@@ -299,46 +356,19 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  // Make sure _initializePet also calls the new update method
-  Future<void> _initializePet() async {
-     // --- Add log ---
-    print('[_initializePet] Initializing pet...');
-    try {
-      // Assuming initializePet ensures data exists or creates defaults
-      await _petModel.initializePet();
-       print('[_initializePet] _petModel.initializePet() completed.');
-      _petData = await _petModel.loadPetData();
-       print('[_initializePet] _petModel.loadPetData() completed.');
-      _updatePetStatsFromData(); // Update state and UI
-       print('[_initializePet] Initial update complete.');
-    } catch (e) {
-      print('Failed to initialize pet: $e');
-      // Handle initialization failure (e.g., show error, set default state)
-      if (mounted) {
-         // Show error message
-         ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(content: Text('Failed to load pet data: $e'), backgroundColor: Colors.red),
-         );
-         setState(() { // Still set default state
-            _petStatus = 'Error';
-            // Set default counts or handle error state appropriately
-            _petsTodayCount = 0;
-            _mealsTodayCount = 0;
-         });
-      }
-    }
-  }
-
-  // Add calls to _updatePetStatsFromData in _playWithPet and _groomPet as well
   void _playWithPet() async {
-     // --- Add log ---
+    if (_getRemainingCooldown('play') > Duration.zero) {
+      _showCooldownMessage('Playing');
+      return;
+    }
     print('[_playWithPet] Button pressed.');
     try {
       await _petModel.playWithPet();
-       print('[_playWithPet] _petModel.playWithPet() completed.');
-      _petData = await _petModel.loadPetData(); // Reload data
-       print('[_playWithPet] _petModel.loadPetData() completed.');
-      _updatePetStatsFromData(); // Update state and UI
+      print('[_playWithPet] _petModel.playWithPet() completed.');
+      _petData = await _petModel.loadPetData();
+      print('[_playWithPet] _petModel.loadPetData() completed.');
+      _updatePetStatsFromData();
+      _updateCooldownTimer('play'); // Update timer after action
     } catch (e) {
       print('Error playing with pet: $e');
        if (mounted) { // Show error to user
@@ -350,14 +380,18 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _groomPet() async {
-     // --- Add log ---
+    if (_getRemainingCooldown('groom') > Duration.zero) {
+      _showCooldownMessage('Grooming');
+      return;
+    }
     print('[_groomPet] Button pressed.');
     try {
       await _petModel.groomPet();
-       print('[_groomPet] _petModel.groomPet() completed.');
-      _petData = await _petModel.loadPetData(); // Reload data
-       print('[_groomPet] _petModel.loadPetData() completed.');
-      _updatePetStatsFromData(); // Update state and UI
+      print('[_groomPet] _petModel.groomPet() completed.');
+      _petData = await _petModel.loadPetData();
+      print('[_groomPet] _petModel.loadPetData() completed.');
+      _updatePetStatsFromData();
+      _updateCooldownTimer('groom'); // Update timer after action
     } catch (e) {
       print('Error grooming pet: $e');
        if (mounted) { // Show error to user
@@ -614,6 +648,17 @@ class _MyHomePageState extends State<MyHomePage> {
     final screenSize = MediaQuery.of(context).size;
     final isSmallScreen = screenSize.width < 360;
 
+    // --- Get current cooldown status and remaining times ---
+    final Duration petCooldownRemaining = _remainingCooldowns['pet'] ?? _getRemainingCooldown('pet');
+    final Duration feedCooldownRemaining = _remainingCooldowns['feed'] ?? _getRemainingCooldown('feed');
+    final Duration playCooldownRemaining = _remainingCooldowns['play'] ?? _getRemainingCooldown('play');
+    final Duration groomCooldownRemaining = _remainingCooldowns['groom'] ?? _getRemainingCooldown('groom');
+
+    final bool isPettingOnCooldown = petCooldownRemaining > Duration.zero;
+    final bool isFeedingOnCooldown = feedCooldownRemaining > Duration.zero;
+    final bool isPlayingOnCooldown = playCooldownRemaining > Duration.zero;
+    final bool isGroomingOnCooldown = groomCooldownRemaining > Duration.zero;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
@@ -834,16 +879,18 @@ class _MyHomePageState extends State<MyHomePage> {
                                   ],
                                 ),
                                 SizedBox(height: constraints.maxHeight * 0.02),
-                                // Bottom row with remaining buttons
+                                // Bottom row with updated buttons
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     _buildFeatureButton(
                                       icon: Icons.pets,
                                       label: 'Pet',
-                                      onPressed: _petThePet,
+                                      onPressed: isPettingOnCooldown ? null : _petThePet,
                                       color: Colors.purple,
                                       size: isSmallScreen ? 40 : 50,
+                                      disabled: isPettingOnCooldown,
+                                      cooldownRemaining: petCooldownRemaining, // Pass remaining time
                                     ),
                                     SizedBox(
                                       width: constraints.maxWidth * 0.05,
@@ -851,13 +898,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                     _buildFeatureButton(
                                       icon: Icons.sports_esports,
                                       label: 'Play',
-                                      onPressed: () {
-                                        if (_petData.isNotEmpty) {
-                                          _playWithPet();
-                                        }
-                                      },
+                                      onPressed: (isPlayingOnCooldown || _petData.isEmpty) ? null : _playWithPet,
                                       color: Colors.blue,
                                       size: isSmallScreen ? 40 : 50,
+                                      disabled: isPlayingOnCooldown,
+                                      cooldownRemaining: playCooldownRemaining, // Pass remaining time
                                     ),
                                     SizedBox(
                                       width: constraints.maxWidth * 0.05,
@@ -865,9 +910,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                     _buildFeatureButton(
                                       icon: Icons.restaurant,
                                       label: 'Feed',
-                                      onPressed: _feedThePet,
+                                      onPressed: isFeedingOnCooldown ? null : _feedThePet,
                                       color: Colors.orange,
                                       size: isSmallScreen ? 40 : 50,
+                                      disabled: isFeedingOnCooldown,
+                                      cooldownRemaining: feedCooldownRemaining, // Pass remaining time
                                     ),
                                     SizedBox(
                                       width: constraints.maxWidth * 0.05,
@@ -875,13 +922,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                     _buildFeatureButton(
                                       icon: Icons.cleaning_services,
                                       label: 'Groom',
-                                      onPressed: () {
-                                        if (_petData.isNotEmpty) {
-                                          _groomPet();
-                                        }
-                                      },
+                                      onPressed: (isGroomingOnCooldown || _petData.isEmpty) ? null : _groomPet,
                                       color: Colors.green,
                                       size: isSmallScreen ? 40 : 50,
+                                      disabled: isGroomingOnCooldown,
+                                      cooldownRemaining: groomCooldownRemaining, // Pass remaining time
                                     ),
                                   ],
                                 ),
@@ -1322,33 +1367,56 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Widget _buildFeatureButton({
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     required IconData icon,
     required String label,
     required Color color,
     double size = 50,
+    bool disabled = false,
+    Duration? cooldownRemaining, // Add optional remaining duration
   }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
-            shape: BoxShape.circle,
+    final effectiveColor = disabled ? Colors.grey : color;
+    final bool showTimer = disabled && cooldownRemaining != null && cooldownRemaining > Duration.zero;
+
+    return Opacity(
+      opacity: disabled ? 0.5 : 1.0,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: size, // Ensure container has size for the Text
+            height: size,
+            decoration: BoxDecoration(
+              color: effectiveColor.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Center( // Center the icon or timer text
+              child: showTimer
+                  ? Text(
+                      '${cooldownRemaining.inSeconds}', // Display remaining seconds
+                      style: GoogleFonts.fredoka(
+                        fontSize: size * 0.4, // Adjust font size relative to button size
+                        fontWeight: FontWeight.bold,
+                        color: effectiveColor,
+                      ),
+                    )
+                  : IconButton( // Use IconButton for standard behavior (tooltip, padding)
+                      icon: Icon(icon, color: effectiveColor),
+                      onPressed: onPressed,
+                      iconSize: size * 0.6,
+                      padding: EdgeInsets.zero, // Use Center for positioning
+                      tooltip: disabled ? '$label (Resting)' : label,
+                      splashRadius: size * 0.7, // Adjust splash radius if needed
+                    ),
+            )
           ),
-          child: IconButton(
-            icon: Icon(icon, color: color),
-            onPressed: onPressed,
-            iconSize: size * 0.6,
-            padding: EdgeInsets.all(size * 0.2),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: GoogleFonts.fredoka(fontSize: 12, color: Colors.grey.shade700),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.fredoka(fontSize: 12, color: Colors.grey.shade700),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1580,19 +1648,17 @@ class _MyHomePageState extends State<MyHomePage> {
      _loadHappinessCoins();
   }
 
-  // Navigation method (should already exist from previous step)
+  // Navigation method
   void _navigateToTasks() {
-     // Ensure you have access to AttendanceService here if not a singleton
-     final attendanceService = AttendanceService(); // Instantiate or get service
-     // Ensure latest petData is loaded before navigating
+     final attendanceService = AttendanceService();
      _petModel.loadPetData().then((latestPetData) {
-        if (!mounted) return; // Check if still mounted after async operation
+        if (!mounted) return;
         Navigator.push(
            context,
            MaterialPageRoute(
               builder: (context) => PetTasksScreen(
                  petModel: _petModel,
-                 petData: latestPetData, // Pass latest data
+                 petData: latestPetData,
                  attendanceService: attendanceService,
                  onCoinsUpdated: _refreshCoinDisplay,
               ),
@@ -1610,6 +1676,98 @@ class _MyHomePageState extends State<MyHomePage> {
            );
         }
      });
+  }
+
+  // --- Cooldown Helper Methods ---
+
+  Duration _getRemainingCooldown(String interactionType) {
+    final lastInteraction = _petData['lastInteractionTimes']?[interactionType];
+    if (lastInteraction is DateTime) {
+      final now = DateTime.now();
+      final timePassed = now.difference(lastInteraction);
+      if (timePassed < _interactionCooldown) {
+        return _interactionCooldown - timePassed;
+      }
+    }
+    return Duration.zero; // No cooldown remaining
+  }
+
+  void _updateCooldownTimer(String interactionType) {
+    // Cancel existing timer for this type if any
+    _cooldownTimers[interactionType]?.cancel();
+
+    Duration remaining = _getRemainingCooldown(interactionType);
+    if (remaining > Duration.zero) {
+      if (mounted) { // Check if widget is still mounted
+         setState(() {
+             _remainingCooldowns[interactionType] = remaining;
+         });
+      }
+
+      // Start a new timer
+      _cooldownTimers[interactionType] = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) { // Check again inside timer callback
+           timer.cancel();
+           _cooldownTimers.remove(interactionType);
+           return;
+        }
+        final currentRemaining = _getRemainingCooldown(interactionType);
+        setState(() {
+          _remainingCooldowns[interactionType] = currentRemaining;
+        });
+
+        if (currentRemaining <= Duration.zero) {
+          timer.cancel();
+          _cooldownTimers.remove(interactionType);
+          print("Cooldown finished for $interactionType");
+          // Final update to ensure button enables
+          if (mounted) setState(() {});
+        }
+      });
+    } else {
+       // Ensure remaining time is cleared if cooldown ended before timer logic
+       if (_remainingCooldowns.containsKey(interactionType)) {
+           if (mounted) {
+              setState(() {
+                 _remainingCooldowns.remove(interactionType);
+              });
+           }
+       }
+       _cooldownTimers.remove(interactionType); // Remove any stale timer entry
+    }
+  }
+
+  // Helper to update all timers, useful after loading data
+  void _updateAllCooldownTimers() {
+     const interactionTypes = ['pet', 'feed', 'play', 'groom'];
+     for (var type in interactionTypes) {
+        _updateCooldownTimer(type);
+     }
+  }
+
+  // Override _initializePet and interaction methods to update timers after loading data
+  Future<void> _initializePet() async {
+    print('[_initializePet] Initializing pet...');
+    try {
+      await _petModel.initializePet();
+      print('[_initializePet] _petModel.initializePet() completed.');
+      _petData = await _petModel.loadPetData();
+      print('[_initializePet] _petModel.loadPetData() completed.');
+      _updatePetStatsFromData(); // Update state and UI
+      _updateAllCooldownTimers(); // Start/update timers after loading
+      print('[_initializePet] Initial update complete.');
+    } catch (e) {
+      print('Failed to initialize pet: $e');
+      if (mounted) {
+          setState(() {
+             _petStatus = 'Error';
+             _petsTodayCount = 0;
+             _mealsTodayCount = 0;
+             // Initialize _petData to avoid null errors in build
+             _petData = {'happiness': 0, 'lastInteractionTimes': {}}; // Ensure lastInteractionTimes exists
+          });
+      }
+    }
   }
 }
 
