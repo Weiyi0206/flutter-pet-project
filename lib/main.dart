@@ -13,25 +13,11 @@ import 'package:logging/logging.dart';
 import 'screens/daily_tips_screen.dart';
 import 'dart:async';
 import 'widgets/animated_pet.dart';
-import 'widgets/happiness_meter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'screens/tests_list_screen.dart'; 
 import 'services/attendance_service.dart';
-
-import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:lottie/lottie.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart';
-import 'dart:math';
-import 'services/gemini_service.dart';
-import 'screens/chat_history_screen.dart';
-import 'screens/help_support_screen.dart';
-import 'screens/attendance_screen.dart';
 import 'screens/diary_screen.dart'; // Add this import
 import 'services/emotion_service.dart';
 
