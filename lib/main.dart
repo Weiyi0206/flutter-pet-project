@@ -117,7 +117,12 @@ class _MyHomePageState extends State<MyHomePage> {
   final PetModel _petModel = PetModel();
   Map<String, dynamic> _petData = {};
 
-  int _happiness = 50;
+  // --- New state variables for daily stats ---
+  int _petsTodayCount = 0;
+  int _mealsTodayCount = 0;
+  final int _maxMealsPerDay = 3; // Define max meals per day
+
+  int _happiness = 50; // Keep happiness for fallback mood calculation
   String _petStatus = 'Normal';
   String? _currentResponse;
   String? _lastUserMessage;
@@ -145,9 +150,6 @@ class _MyHomePageState extends State<MyHomePage> {
     "I'm here for you. Want to talk about anything?",
     "Sometimes just sharing your thoughts can help. What's going on in your world?",
   ];
-
-  int _connectionStreak = 0;
-  DateTime? _lastConnectionDate;
 
   int _totalHappinessCoins = 0; // Add this line to track happiness coins
 
@@ -177,7 +179,7 @@ class _MyHomePageState extends State<MyHomePage> {
       showInitialCheckIn();
     });
 
-    // Initialize pet data and status
+    // Initialize pet data and status/stats
     _initializePet();
 
     // Check connection to AI service
@@ -218,44 +220,159 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  // --- Modified methods to update stats ---
+
+  // Renamed and enhanced to update all stats from _petData
+  void _updatePetStatsFromData() {
+    if (!mounted) return; // Check if widget is still mounted
+
+    // --- Add log ---
+    print('[_updatePetStatsFromData] Received _petData: $_petData');
+
+    setState(() {
+      // Extract daily counts from _petData, defaulting to 0 if not found
+      _petsTodayCount = _petData['petsToday'] as int? ?? 0;
+      _mealsTodayCount = _petData['mealsToday'] as int? ?? 0;
+
+      // --- Add logs ---
+      print('[_updatePetStatsFromData] Updated state: _petsTodayCount=$_petsTodayCount, _mealsTodayCount=$_mealsTodayCount');
+
+      // Update mood status based on petData first, then fallback to happiness
+      if (_petData.isNotEmpty && _petData.containsKey('mood')) {
+        _petStatus = _petData['mood'] as String? ?? 'Normal';
+        // --- Add log ---
+        print('[_updatePetStatsFromData] Updated state: _petStatus=$_petStatus (from _petData)');
+      } else {
+        // Fallback logic based on happiness (can be adjusted)
+        if (_happiness >= 80) {
+          _petStatus = 'Happy';
+        } else if (_happiness >= 40) {
+          _petStatus = 'Content';
+        } else {
+          _petStatus = 'Sad';
+        }
+        // --- Add log ---
+        print('[_updatePetStatsFromData] Updated state: _petStatus=$_petStatus (from fallback)');
+      }
+      // Note: _happiness itself might need to be loaded from _petData too
+      // _happiness = _petData['happiness'] as int? ?? 50;
+    });
+  }
+
+  // Call _updatePetStatsFromData after loading data in interaction methods
   void _petThePet() async {
+    // --- Add log ---
+    print('[_petThePet] Button pressed.');
     try {
-      await _petModel.petPet();
-      _petData = await _petModel.loadPetData();
-      setState(() {
-        _updatePetStatus();
-      });
+      await _petModel.petPet(); // Assumes this updates DB
+      print('[_petThePet] _petModel.petPet() completed.');
+      _petData = await _petModel.loadPetData(); // Reload data
+      print('[_petThePet] _petModel.loadPetData() completed.');
+      _updatePetStatsFromData(); // Update state and UI
     } catch (e) {
       print('Error petting pet: $e');
+      if (mounted) { // Show error to user
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error petting pet: $e'), backgroundColor: Colors.red),
+          );
+      }
     }
   }
 
   void _feedThePet() async {
+    // --- Add log ---
+    print('[_feedThePet] Button pressed.');
     try {
-      await _petModel.feedPet();
-      _petData = await _petModel.loadPetData();
-      setState(() {
-        _updatePetStatus();
-      });
+      await _petModel.feedPet(); // Assumes this updates DB
+      print('[_feedThePet] _petModel.feedPet() completed.');
+      _petData = await _petModel.loadPetData(); // Reload data
+      print('[_feedThePet] _petModel.loadPetData() completed.');
+      _updatePetStatsFromData(); // Update state and UI
     } catch (e) {
       print('Error feeding pet: $e');
-    }
-  }
-
-  void _updatePetStatus() {
-    // Use mood from pet data if available, otherwise use happiness level
-    if (_petData.isNotEmpty && _petData.containsKey('mood')) {
-      _petStatus = _petData['mood'];
-    } else {
-      if (_happiness >= 80) {
-        _petStatus = 'Happy';
-      } else if (_happiness >= 40) {
-        _petStatus = 'Content';
-      } else {
-        _petStatus = 'Sad';
+       if (mounted) { // Show error to user
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error feeding pet: $e'), backgroundColor: Colors.red),
+          );
       }
     }
   }
+
+  // Make sure _initializePet also calls the new update method
+  Future<void> _initializePet() async {
+     // --- Add log ---
+    print('[_initializePet] Initializing pet...');
+    try {
+      // Assuming initializePet ensures data exists or creates defaults
+      await _petModel.initializePet();
+       print('[_initializePet] _petModel.initializePet() completed.');
+      _petData = await _petModel.loadPetData();
+       print('[_initializePet] _petModel.loadPetData() completed.');
+      _updatePetStatsFromData(); // Update state and UI
+       print('[_initializePet] Initial update complete.');
+    } catch (e) {
+      print('Failed to initialize pet: $e');
+      // Handle initialization failure (e.g., show error, set default state)
+      if (mounted) {
+         // Show error message
+         ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text('Failed to load pet data: $e'), backgroundColor: Colors.red),
+         );
+         setState(() { // Still set default state
+            _petStatus = 'Error';
+            // Set default counts or handle error state appropriately
+            _petsTodayCount = 0;
+            _mealsTodayCount = 0;
+         });
+      }
+    }
+  }
+
+  // Add calls to _updatePetStatsFromData in _playWithPet and _groomPet as well
+  void _playWithPet() async {
+     // --- Add log ---
+    print('[_playWithPet] Button pressed.');
+    try {
+      await _petModel.playWithPet(); // Assumes this updates DB
+       print('[_playWithPet] _petModel.playWithPet() completed.');
+      _petData = await _petModel.loadPetData(); // Reload data
+       print('[_playWithPet] _petModel.loadPetData() completed.');
+      _updatePetStatsFromData(); // Update state and UI
+    } catch (e) {
+      print('Error playing with pet: $e');
+       if (mounted) { // Show error to user
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error playing with pet: $e'), backgroundColor: Colors.red),
+          );
+      }
+    }
+  }
+
+  void _groomPet() async {
+     // --- Add log ---
+    print('[_groomPet] Button pressed.');
+    try {
+      await _petModel.groomPet(); // Assumes this updates DB
+       print('[_groomPet] _petModel.groomPet() completed.');
+      _petData = await _petModel.loadPetData(); // Reload data
+       print('[_groomPet] _petModel.loadPetData() completed.');
+      _updatePetStatsFromData(); // Update state and UI
+    } catch (e) {
+      print('Error grooming pet: $e');
+       if (mounted) { // Show error to user
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error grooming pet: $e'), backgroundColor: Colors.red),
+          );
+      }
+    }
+  }
+
+  // Remove the old _updatePetStatus method as its logic is now in _updatePetStatsFromData
+  /*
+  void _updatePetStatus() {
+    // ... old logic ...
+  }
+  */
 
   void _sendMessage() async {
     if (_chatController.text.trim().isEmpty) return;
@@ -306,7 +423,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
       // Store the response in history and show it
       if (mounted) {
-        setState(() {
+        // Reload pet data after interaction (optional, depends if chat affects stats)
+        // _petData = await _petModel.loadPetData();
+
+        setState(() { // Keep setState for message list updates
           _messages.add(
             ChatMessage(text: response, isUser: false, timestamp: timeString),
           );
@@ -316,20 +436,19 @@ class _MyHomePageState extends State<MyHomePage> {
           if (hasEmotionalContent) {
             _happiness = min(_happiness + 5, 100); // Happiness boost for emotional sharing
           }
-
           // Additional happiness adjustments based on detected mood
           if (detectedMood != null) {
             if (detectedMood == 'positive') {
               _happiness = min(_happiness + 3, 100);
             } else if (detectedMood == 'negative') {
-              // No negative adjustment - don't penalize negative emotions
-              // Instead give a small boost for sharing
               _happiness = min(_happiness + 1, 100);
             }
           }
-
-          _updatePetStatus();
+          // Note: Consider if happiness should directly affect petData and be saved
         });
+
+        // Update pet stats/status based on potentially changed happiness/data
+        _updatePetStatsFromData(); // Call this AFTER state updates potentially affecting mood
 
         // Remove pet response after a delay
         Future.delayed(const Duration(seconds: 15), () {
@@ -872,7 +991,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                   ),
                                   child: Column(
                                     children: [
-                                      // Today's activities
+                                      // Today's activities - Updated values
                                       Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceAround,
@@ -880,21 +999,23 @@ class _MyHomePageState extends State<MyHomePage> {
                                           _buildActivityStat(
                                             icon: Icons.pets,
                                             label: 'Pets today',
-                                            value: '${_random.nextInt(10) + 5}',
+                                            // --- Use state variable ---
+                                            value: '$_petsTodayCount',
                                             color: Colors.purple,
                                             constraints: constraints,
                                           ),
                                           _buildActivityStat(
                                             icon: Icons.restaurant,
                                             label: 'Meals',
-                                            value:
-                                                '${_random.nextInt(3) + 1}/3',
+                                            // --- Use state variables ---
+                                            value: '$_mealsTodayCount/$_maxMealsPerDay',
                                             color: Colors.orange,
                                             constraints: constraints,
                                           ),
                                           _buildActivityStat(
                                             icon: Icons.favorite,
                                             label: 'Mood',
+                                            // --- Remains the same ---
                                             value: _petStatus,
                                             color: _getStatusTextColor(),
                                             constraints: constraints,
@@ -906,7 +1027,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                         height: constraints.maxHeight * 0.015,
                                       ),
 
-                                      // Daily streak
+                                      // --- Replaced Daily streak with Happiness display ---
                                       Container(
                                         padding: EdgeInsets.symmetric(
                                           vertical:
@@ -915,18 +1036,23 @@ class _MyHomePageState extends State<MyHomePage> {
                                               constraints.maxWidth * 0.03,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Colors.amber.shade100,
+                                          // Use a color that fits happiness, maybe based on mood
+                                          color: _getStatusTextColor().withOpacity(0.15),
                                           borderRadius: BorderRadius.circular(
                                             12,
                                           ),
+                                          border: Border.all(
+                                            color: _getStatusTextColor().withOpacity(0.5)
+                                          )
                                         ),
                                         child: Row(
                                           mainAxisAlignment:
                                               MainAxisAlignment.center,
                                           children: [
                                             Icon(
-                                              Icons.local_fire_department,
-                                              color: Colors.orange,
+                                              // Choose an icon for happiness
+                                              Icons.favorite,
+                                              color: _getStatusTextColor(), // Use mood color
                                               size: constraints.maxWidth * 0.05,
                                             ),
                                             SizedBox(
@@ -934,18 +1060,21 @@ class _MyHomePageState extends State<MyHomePage> {
                                                   constraints.maxWidth * 0.02,
                                             ),
                                             Text(
-                                              'Connection streak: $_connectionStreak days',
+                                              // Display happiness value from _petData
+                                              'Happiness: ${_petData['happiness'] ?? '--'}%',
                                               style: GoogleFonts.fredoka(
                                                 fontSize:
                                                     constraints.maxWidth *
                                                     0.035,
-                                                color: Colors.orange.shade800,
+                                                // Use mood color for text too
+                                                color: _getStatusTextColor().withOpacity(0.9),
                                                 fontWeight: FontWeight.w500,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
+                                      // --- End of Happiness display ---
                                     ],
                                   ),
                                 ),
@@ -1434,44 +1563,6 @@ class _MyHomePageState extends State<MyHomePage> {
       setState(() {
         _totalHappinessCoins = coins;
       });
-    }
-  }
-
-  // Add method to initialize pet
-  Future<void> _initializePet() async {
-    try {
-      await _petModel.initializePet();
-      _petData = await _petModel.loadPetData();
-      setState(() {
-        _updatePetStatus();
-      });
-    } catch (e) {
-      print('Failed to initialize pet: $e');
-    }
-  }
-
-  // Add methods for play and groom
-  void _playWithPet() async {
-    try {
-      await _petModel.playWithPet();
-      _petData = await _petModel.loadPetData();
-      setState(() {
-        _updatePetStatus();
-      });
-    } catch (e) {
-      print('Error playing with pet: $e');
-    }
-  }
-
-  void _groomPet() async {
-    try {
-      await _petModel.groomPet();
-      _petData = await _petModel.loadPetData();
-      setState(() {
-        _updatePetStatus();
-      });
-    } catch (e) {
-      print('Error grooming pet: $e');
     }
   }
 }

@@ -3,6 +3,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
+// Helper function to check if two DateTime objects represent the same calendar day
+bool _isSameDay(DateTime? date1, DateTime? date2) {
+  if (date1 == null || date2 == null) {
+    return false; // Treat null as different days
+  }
+  return date1.year == date2.year &&
+      date1.month == date2.month &&
+      date1.day == date2.day;
+}
+
 class PetModel {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String _userId = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -31,14 +41,37 @@ class PetModel {
     'isSleeping': false,
     'lastUpdated': FieldValue.serverTimestamp(),
     'achievements': [],
+
+    // --- New fields for daily tracking ---
+    'petsToday': 0,
+    'lastPetDate': null, // Store as Timestamp in Firestore
+    'mealsToday': 0,
+    'lastFeedDate': null, // Store as Timestamp in Firestore
   };
 
   // Initialize pet data
   Future<void> initializePet() async {
-    final doc = await _firestore.collection('pets').doc(_userId).get();
+    final docRef = _firestore.collection('pets').doc(_userId);
+    final doc = await docRef.get();
     if (!doc.exists) {
+      // Set initial values for new fields
       _petData['lastMetricUpdateTime'] = FieldValue.serverTimestamp();
-      await _firestore.collection('pets').doc(_userId).set(_petData);
+      _petData['lastPetDate'] = FieldValue.serverTimestamp(); // Initialize date
+      _petData['lastFeedDate'] = FieldValue.serverTimestamp(); // Initialize date
+      _petData['petsToday'] = 0;
+      _petData['mealsToday'] = 0;
+      await docRef.set(_petData);
+    } else {
+       // Ensure existing documents have the fields, if not, add them
+       Map<String, dynamic> data = doc.data() ?? {};
+       Map<String, dynamic> updates = {};
+       if (data['petsToday'] == null) updates['petsToday'] = 0;
+       if (data['lastPetDate'] == null) updates['lastPetDate'] = FieldValue.serverTimestamp();
+       if (data['mealsToday'] == null) updates['mealsToday'] = 0;
+       if (data['lastFeedDate'] == null) updates['lastFeedDate'] = FieldValue.serverTimestamp();
+       if (updates.isNotEmpty) {
+          await docRef.update(updates);
+       }
     }
   }
 
@@ -46,74 +79,123 @@ class PetModel {
   Future<Map<String, dynamic>> loadPetData() async {
     final doc = await _firestore.collection('pets').doc(_userId).get();
     if (doc.exists) {
-      _petData = doc.data() ?? _petData;
-      // Convert Firestore timestamps to DateTime
-      _petData['lastInteractionTimes'] = _convertTimestamps(_petData['lastInteractionTimes']);
-      
-      // Convert lastMetricUpdateTime
-      if (_petData['lastMetricUpdateTime'] is Timestamp) {
-        _petData['lastMetricUpdateTime'] = (_petData['lastMetricUpdateTime'] as Timestamp).toDate();
+       // Start with default structure to ensure all keys exist
+      Map<String, dynamic> defaultData = Map.from(_petData);
+      Map<String, dynamic>? serverData = doc.data();
+
+      if (serverData != null) {
+        // Merge server data over default data
+        _petData = {...defaultData, ...serverData};
+
+        // Convert Firestore timestamps to DateTime, handling potential nulls
+        _petData['lastInteractionTimes'] = _convertTimestamps(_petData['lastInteractionTimes'] ?? {});
+
+        _petData['lastMetricUpdateTime'] = _convertToDateTime(_petData['lastMetricUpdateTime']);
+        _petData['lastPetDate'] = _convertToDateTime(_petData['lastPetDate']);
+        _petData['lastFeedDate'] = _convertToDateTime(_petData['lastFeedDate']);
+
+        // Ensure daily counts are integers, default to 0 if null/missing
+        _petData['petsToday'] = _petData['petsToday'] as int? ?? 0;
+        _petData['mealsToday'] = _petData['mealsToday'] as int? ?? 0;
+
+        // Update metrics based on time passed since last update
+        await _updateMetricsBasedOnTime();
+      } else {
+         // Document exists but has no data? Use defaults.
+         _petData = defaultData;
       }
-      
-      // Update metrics based on time passed since last update
-      await _updateMetricsBasedOnTime();
+
+    } else {
+       // Document doesn't exist, try initializing it
+       print("Pet document for $_userId not found, attempting initialization.");
+       await initializePet();
+       // Try loading again after initialization
+       return await loadPetData();
     }
     return _petData;
   }
 
+  // Helper to safely convert Firestore Timestamp or null to DateTime or null
+  DateTime? _convertToDateTime(dynamic timestamp) {
+    if (timestamp is Timestamp) {
+      return timestamp.toDate();
+    }
+    return null;
+  }
+
   // Update metrics naturally based on time passed
   Future<void> _updateMetricsBasedOnTime() async {
-    final lastUpdate = _petData['lastMetricUpdateTime'];
+    // --- Ensure lastPetDate and lastFeedDate are DateTime before use ---
+    final DateTime? lastPetDate = _petData['lastPetDate'];
+    final DateTime? lastFeedDate = _petData['lastFeedDate'];
+    final now = DateTime.now();
+
+    Map<String, dynamic> timeBasedUpdates = {};
+
+    // Check if daily counts need resetting
+    if (!_isSameDay(lastPetDate, now)) {
+      print("New day detected for petting. Resetting count.");
+      timeBasedUpdates['petsToday'] = 0;
+      // Don't update lastPetDate here, it's updated on interaction
+    }
+    if (!_isSameDay(lastFeedDate, now)) {
+      print("New day detected for feeding. Resetting count.");
+      timeBasedUpdates['mealsToday'] = 0;
+      // Don't update lastFeedDate here, it's updated on interaction
+    }
+
+    // Apply daily count resets locally first if needed
+    if (timeBasedUpdates.isNotEmpty) {
+       _petData = {..._petData, ...timeBasedUpdates};
+       // Persist reset counts immediately if day changed
+       await updatePetData(timeBasedUpdates);
+    }
+
+    // Proceed with metric degradation logic
+    final lastUpdate = _petData['lastMetricUpdateTime']; // Already converted to DateTime in loadPetData
     if (lastUpdate == null) {
-      // Initialize if never updated
       _petData['lastMetricUpdateTime'] = DateTime.now();
+      await updatePetData({'lastMetricUpdateTime': FieldValue.serverTimestamp()});
       return;
     }
 
-    final now = DateTime.now();
     final hoursPassed = now.difference(lastUpdate).inHours;
-    
+
     if (hoursPassed >= 1) {
+      print("Updating metrics based on time ($hoursPassed hours passed)...");
       try {
-        // Decrease metrics based on time (more realistic degradation)
         final updates = <String, dynamic>{};
-        
-        // Hunger decreases fastest
+
         updates['hunger'] = _decreaseMetric(_petData['hunger'] ?? 100, hoursPassed * 4);
-        
-        // Affection decreases next fastest
         updates['affection'] = _decreaseMetric(_petData['affection'] ?? 70, hoursPassed * 3);
-        
-        // Hygiene decreases more slowly
         updates['hygiene'] = _decreaseMetric(_petData['hygiene'] ?? 100, hoursPassed * 2);
-        
-        // Energy regenerates over time if pet is sleeping
+
         if (_petData['isSleeping'] == true) {
           updates['energy'] = _increaseMetric(
-            _petData['energy'] ?? 0, 
-            hoursPassed * 10, 
+            _petData['energy'] ?? 0,
+            hoursPassed * 10,
             _petData['maxEnergy'] ?? 100
           );
         }
-        
-        // Calculate overall happiness based on other metrics
-        final avgMetric = (updates['hunger'] + updates['affection'] + updates['hygiene']) / 3;
-        updates['happiness'] = avgMetric;
-        
-        // Set mood based on happiness
+
+        final currentHappiness = _petData['happiness'] ?? 80;
+        final hungerFactor = (updates['hunger'] / 100.0); // 0-1
+        final affectionFactor = (updates['affection'] / 100.0); // 0-1
+        final hygieneFactor = (updates['hygiene'] / 100.0); // 0-1
+        // Average needs fulfillment and scale to happiness range (e.g., 0-100)
+        updates['happiness'] = math.max(0, math.min(100, ((hungerFactor + affectionFactor + hygieneFactor) / 3 * 100).round()));
+
         updates['mood'] = _getMoodFromHappiness(updates['happiness']);
-        
-        // Update timestamp
-        updates['lastMetricUpdateTime'] = now;
-        
+        updates['lastMetricUpdateTime'] = FieldValue.serverTimestamp(); // Use server timestamp for saving
+
         // Apply updates locally
         _petData = {..._petData, ...updates};
-        
+
         // Save to database
         await updatePetData(updates);
+        print("Metrics updated successfully based on time.");
       } catch (e) {
         print('Error updating metrics based on time: $e');
-        // Don't rethrow as this is an internal method
       }
     }
   }
@@ -140,7 +222,8 @@ class PetModel {
 
   // Update pet data
   Future<void> updatePetData(Map<String, dynamic> updates) async {
-    updates['lastUpdated'] = FieldValue.serverTimestamp();
+    // Avoid updating lastUpdated field within this method, let Firestore handle it on write
+    // updates['lastUpdated'] = FieldValue.serverTimestamp();
     await _firestore.collection('pets').doc(_userId).update(updates);
   }
 
@@ -148,11 +231,7 @@ class PetModel {
   Map<String, dynamic> _convertTimestamps(Map<String, dynamic> times) {
     final converted = <String, dynamic>{};
     times.forEach((key, value) {
-      if (value is Timestamp) {
-        converted[key] = value.toDate();
-      } else {
-        converted[key] = value;
-      }
+      converted[key] = _convertToDateTime(value); // Use helper function
     });
     return converted;
   }
@@ -168,6 +247,20 @@ class PetModel {
   // Feed the pet
   Future<void> feedPet() async {
     try {
+      final now = DateTime.now();
+      final lastFeedDate = _petData['lastFeedDate']; // Already DateTime or null
+      int currentMealsToday = _petData['mealsToday'] ?? 0;
+      int updatedMealsToday;
+
+      if (!_isSameDay(lastFeedDate, now)) {
+        print("[feedPet] First meal of the day.");
+        updatedMealsToday = 1; // Reset count for the new day
+      } else {
+        updatedMealsToday = currentMealsToday + 1;
+      }
+
+      print("[feedPet] mealsToday count updated to $updatedMealsToday");
+
       // Different foods could have different impacts
       final hunger = math.min(100, (_petData['hunger'] ?? 0) + 30);
       final energy = math.min(_petData['maxEnergy'] ?? 100, (_petData['energy'] ?? 0) + 20);
@@ -178,12 +271,18 @@ class PetModel {
         'energy': energy,
         'happiness': happiness,
         'mood': _getMoodFromHappiness(happiness),
-        'lastInteractionTimes.feed': FieldValue.serverTimestamp(),
+        'mealsToday': updatedMealsToday, // Store updated count
+        'lastFeedDate': FieldValue.serverTimestamp(), // Update last feed time
+        'lastInteractionTimes.feed': FieldValue.serverTimestamp(), // Keep this for general interaction tracking if needed
       };
       
       // Update local and remote
       _petData = {..._petData, ...updates};
+      // Update the timestamp locally *after* adding ServerTimestamp to updates map
+      _petData['lastFeedDate'] = now;
+
       await updatePetData(updates);
+      print("[feedPet] Pet fed successfully.");
     } catch (e) {
       print('Error feeding pet: $e');
       rethrow;
@@ -193,6 +292,20 @@ class PetModel {
   // Pet the pet (show affection)
   Future<void> petPet() async {
     try {
+      final now = DateTime.now();
+      final lastPetDate = _petData['lastPetDate']; // Already DateTime or null
+      int currentPetsToday = _petData['petsToday'] ?? 0;
+      int updatedPetsToday;
+
+      if (!_isSameDay(lastPetDate, now)) {
+         print("[petPet] First pet of the day.");
+        updatedPetsToday = 1; // Reset count for the new day
+      } else {
+        updatedPetsToday = currentPetsToday + 1;
+      }
+
+      print("[petPet] petsToday count updated to $updatedPetsToday");
+
       // Petting increases affection and happiness
       final affection = math.min(100, (_petData['affection'] ?? 0) + 15);
       final happiness = math.min(100, (_petData['happiness'] ?? 0) + 5);
@@ -201,12 +314,18 @@ class PetModel {
         'affection': affection,
         'happiness': happiness,
         'mood': _getMoodFromHappiness(happiness),
-        'lastInteractionTimes.pet': FieldValue.serverTimestamp(),
+        'petsToday': updatedPetsToday, // Store updated count
+        'lastPetDate': FieldValue.serverTimestamp(), // Update last pet time
+        'lastInteractionTimes.pet': FieldValue.serverTimestamp(), // Keep this for general interaction tracking if needed
       };
       
       // Update local and remote
       _petData = {..._petData, ...updates};
+      // Update the timestamp locally *after* adding ServerTimestamp to updates map
+      _petData['lastPetDate'] = now;
+
       await updatePetData(updates);
+       print("[petPet] Pet petted successfully.");
     } catch (e) {
       print('Error petting pet: $e');
       rethrow;
@@ -331,11 +450,15 @@ class PetModel {
     if (doc.exists) {
       final data = doc.data();
       final achievements = List<Map<String, dynamic>>.from(data?['achievements'] ?? []);
-      // Convert Firestore timestamps to DateTime
+      // Convert Firestore timestamps and color values
       return achievements.map((achievement) {
         if (achievement['date'] is Timestamp) {
-          achievement['date'] = achievement['date'].toDate().toString();
+          achievement['date'] = achievement['date'].toDate().toString(); // Convert date for display
         }
+        if (achievement['color'] is int) {
+          achievement['color'] = Color(achievement['color']); // Recreate Color object
+        }
+        // You might need a way to map icon string back to IconData if needed for display elsewhere
         return achievement;
       }).toList();
     }
@@ -343,37 +466,40 @@ class PetModel {
   }
 
   // Check for new achievements
-  Future<void> checkForNewAchievements(Map<String, dynamic> petData) async {
-    final achievements = await getAchievements();
-    final currentAchievements = Set<String>.from(achievements.map((a) => a['title']));
+  Future<void> checkForNewAchievements() async {
+    // Ensure latest data is loaded before checking
+    final currentPetData = await loadPetData();
+    final achievements = currentPetData['achievements'] ?? [];
+    final currentAchievementTitles = Set<String>.from(achievements.map((a) => a['title']));
 
     // Level achievements
-    if (petData['level'] >= 5 && !currentAchievements.contains('Level 5')) {
-      await addAchievement('Level 5', 'Icons.star', Colors.amber, 10);
+    if (currentPetData['level'] >= 5 && !currentAchievementTitles.contains('Level 5')) {
+      await addAchievement('Level 5', 'star', Colors.amber, 10); // Use string for icon
     }
-    if (petData['level'] >= 10 && !currentAchievements.contains('Level 10')) {
-      await addAchievement('Level 10', 'Icons.star', Colors.amber, 20);
+    if (currentPetData['level'] >= 10 && !currentAchievementTitles.contains('Level 10')) {
+      await addAchievement('Level 10', 'star', Colors.amber, 20);
     }
 
     // Trick achievements
-    if (petData['learnedTricks'].length >= 3 && !currentAchievements.contains('Trick Master')) {
-      await addAchievement('Trick Master', 'Icons.pets', Colors.purple, 15);
+    if ((currentPetData['learnedTricks']?.length ?? 0) >= 3 && !currentAchievementTitles.contains('Trick Master')) {
+      await addAchievement('Trick Master', 'pets', Colors.purple, 15);
     }
-    if (petData['learnedTricks'].length >= 5 && !currentAchievements.contains('Trick Expert')) {
-      await addAchievement('Trick Expert', 'Icons.pets', Colors.purple, 25);
+    if ((currentPetData['learnedTricks']?.length ?? 0) >= 5 && !currentAchievementTitles.contains('Trick Expert')) {
+      await addAchievement('Trick Expert', 'pets', Colors.purple, 25);
     }
 
     // Energy achievements
-    if (petData['maxEnergy'] >= 150 && !currentAchievements.contains('Energy Boost')) {
-      await addAchievement('Energy Boost', 'Icons.energy_savings_leaf', Colors.blue, 15);
+    if (currentPetData['maxEnergy'] >= 150 && !currentAchievementTitles.contains('Energy Boost')) {
+      await addAchievement('Energy Boost', 'energy_savings_leaf', Colors.blue, 15);
     }
     
     // New care achievements
-    if (petData['happiness'] >= 90 && !currentAchievements.contains('Happy Pet')) {
-      await addAchievement('Happy Pet', 'Icons.sentiment_very_satisfied', Colors.yellow, 20);
+    if (currentPetData['happiness'] >= 90 && !currentAchievementTitles.contains('Happy Pet')) {
+      await addAchievement('Happy Pet', 'sentiment_very_satisfied', Colors.yellow, 20);
     }
-    if (petData['affection'] >= 95 && !currentAchievements.contains('Best Friends')) {
-      await addAchievement('Best Friends', 'Icons.favorite', Colors.pink, 25);
+    if (currentPetData['affection'] >= 95 && !currentAchievementTitles.contains('Best Friends')) {
+      await addAchievement('Best Friends', 'favorite', Colors.pink, 25);
     }
+    // Add more achievement checks as needed
   }
 } 
