@@ -850,53 +850,6 @@ class _MyHomePageState extends State<MyHomePage> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today),
-            tooltip: 'Daily Attendance',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => AttendanceScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.lightbulb_outline),
-            tooltip: 'Tips',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => DailyTipsScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'Chat History',
-            onPressed: () {
-              if (_userId.isNotEmpty) { // Only navigate if user ID is available
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    // Pass userId instead of the local messages list
-                    builder: (context) => ChatHistoryScreen(userId: _userId),
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Cannot view history. User not logged in.'), backgroundColor: Colors.orange),
-                );
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-            },
-          ),
-        ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -1381,6 +1334,61 @@ class _MyHomePageState extends State<MyHomePage> {
                                 .fadeIn(duration: 300.ms)
                                 .slideX(begin: 0.5, end: 0, duration: 300.ms),
                           ),
+
+                        // --- MOVED Tips and History Buttons ---
+                        Positioned(
+                          // Adjust top to vertically align with the pet's center
+                          top: constraints.maxHeight * 0.35 + (constraints.maxWidth * 0.55 / 4), // Centering attempt
+                          left: 0,
+                          right: 0,
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.08), // Padding from screen edges
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween, // Space them out
+                              children: [
+                                // Tips Button - Updated
+                                _buildFeatureButton(
+                                  icon: Icons.lightbulb_outline,
+                                  label: 'Tips',
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => DailyTipsScreen()),
+                                    );
+                                  },
+                                  color: Colors.orange,
+                                  size: 40, // Use a fixed size or adjust as needed
+                                  // disabled: false, // Default
+                                  // cooldownRemaining: null, // Default
+                                ),
+                                // History Button - Updated
+                                _buildFeatureButton(
+                                  icon: Icons.history,
+                                  label: 'History',
+                                  onPressed: () {
+                                    if (_userId.isNotEmpty) { // Only navigate if user ID is available
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ChatHistoryScreen(userId: _userId),
+                                        ),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Cannot view history. User not logged in.'), backgroundColor: Colors.orange),
+                                      );
+                                    }
+                                  },
+                                  color: Colors.blueGrey,
+                                  size: 40, // Use a fixed size or adjust as needed
+                                  // disabled: false, // Default
+                                  // cooldownRemaining: null, // Default
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        // --- END MOVED Buttons ---
                       ],
                     );
                   },
