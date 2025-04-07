@@ -23,6 +23,32 @@ import 'services/emotion_service.dart';
 import 'models/pet_model.dart';
 import 'screens/pet_tasks_screen.dart';
 
+// --- Added PetTask class ---
+// Define a Task class for better structure (copied from pet_tasks_screen.dart)
+class PetTask {
+  final String id;
+  final String name;
+  final String description;
+  final IconData icon;
+  final Color color;
+  final int requiredCount;
+  final String currentCountKey; // Key in petData for current progress (e.g., 'petsToday')
+  final int coinReward;
+  // Add other potential rewards like XP if needed
+  // final int xpReward;
+
+  PetTask({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.icon,
+    required this.color,
+    required this.requiredCount,
+    required this.currentCountKey,
+    required this.coinReward,
+    // this.xpReward = 0,
+  });
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -122,6 +148,56 @@ class _MyHomePageState extends State<MyHomePage> {
   int _petsTodayCount = 0;
   int _mealsTodayCount = 0;
   final int _maxMealsPerDay = 3; // Define max meals per day
+
+  // --- Added Task Definitions ---
+  // Define the list of tasks (copied from pet_tasks_screen.dart)
+  // NOTE: Ensure these match the definitions in pet_tasks_screen.dart
+  // A shared model file would be a better long-term solution.
+  final List<PetTask> _tasks = [
+    PetTask(
+      id: 'pet_3_times',
+      name: 'Show Affection',
+      description: 'Pet your companion 3 times today',
+      icon: Icons.pets,
+      color: Colors.purple,
+      requiredCount: 3,
+      currentCountKey: 'petsToday',
+      coinReward: 2,
+    ),
+    PetTask(
+      id: 'feed_1_time',
+      name: 'Meal Time',
+      description: 'Feed your pet at least once today',
+      icon: Icons.restaurant,
+      color: Colors.orange,
+      requiredCount: 1,
+      currentCountKey: 'mealsToday',
+      coinReward: 1,
+    ),
+    PetTask(
+      id: 'play_2_times',
+      name: 'Play Session',
+      description: 'Play with your pet 2 times',
+      icon: Icons.sports_esports,
+      color: Colors.blue,
+      requiredCount: 2,
+      currentCountKey: 'playsToday', // Assumes PetModel tracks this
+      coinReward: 2,
+    ),
+    PetTask(
+      id: 'groom_1_time',
+      name: 'Grooming',
+      description: 'Groom your pet once',
+      icon: Icons.cleaning_services,
+      color: Colors.green,
+      requiredCount: 1,
+      currentCountKey: 'groomsToday', // Assumes PetModel tracks this
+      coinReward: 1,
+    ),
+  ];
+
+  // --- Added Completed Tasks Count ---
+  int _completedTasksCount = 0;
 
   int _happiness = 50; // Keep happiness for fallback mood calculation
   String _petStatus = 'Normal';
@@ -272,7 +348,29 @@ class _MyHomePageState extends State<MyHomePage> {
       }
       // Note: _happiness itself might need to be loaded from _petData too
       // _happiness = _petData['happiness'] as int? ?? 50;
+
+      // --- Calculate completed tasks ---
+      _calculateCompletedTasks();
     });
+  }
+
+  // --- Added Method to Calculate Completed Tasks ---
+  void _calculateCompletedTasks() {
+    if (_petData.isEmpty) {
+      _completedTasksCount = 0;
+      return;
+    }
+
+    int count = 0;
+    for (var task in _tasks) {
+      final int currentCount = _petData[task.currentCountKey] as int? ?? 0;
+      if (currentCount >= task.requiredCount) {
+        count++;
+      }
+    }
+    // No need for setState here as it's called within _updatePetStatsFromData's setState
+    _completedTasksCount = count;
+    print('[_calculateCompletedTasks] Calculated completed tasks: $_completedTasksCount / ${_tasks.length}');
   }
 
   // --- Helper to check cooldown ---
@@ -1066,11 +1164,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                             constraints: constraints,
                                           ),
                                           _buildActivityStat(
-                                            icon: Icons.favorite,
-                                            label: 'Mood',
-                                            // --- Remains the same ---
-                                            value: _petStatus,
-                                            color: _getStatusTextColor(),
+                                            icon: Icons.check_circle_outline, // Changed Icon
+                                            label: 'Tasks Done', // Changed Label
+                                            value: '$_completedTasksCount/${_tasks.length}', // Use calculated values
+                                            color: Colors.green.shade700, // Changed Color
                                             constraints: constraints,
                                           ),
                                         ],
@@ -1753,7 +1850,7 @@ class _MyHomePageState extends State<MyHomePage> {
       print('[_initializePet] _petModel.initializePet() completed.');
       _petData = await _petModel.loadPetData();
       print('[_initializePet] _petModel.loadPetData() completed.');
-      _updatePetStatsFromData(); // Update state and UI
+      _updatePetStatsFromData(); // Update state, UI, and calculate tasks
       _updateAllCooldownTimers(); // Start/update timers after loading
       print('[_initializePet] Initial update complete.');
     } catch (e) {
@@ -1763,6 +1860,7 @@ class _MyHomePageState extends State<MyHomePage> {
              _petStatus = 'Error';
              _petsTodayCount = 0;
              _mealsTodayCount = 0;
+             _completedTasksCount = 0; // Reset task count on error
              // Initialize _petData to avoid null errors in build
              _petData = {'happiness': 0, 'lastInteractionTimes': {}}; // Ensure lastInteractionTimes exists
           });
