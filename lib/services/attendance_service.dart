@@ -322,6 +322,49 @@ class AttendanceService {
       totalCoins: totalCoins,
     );
   }
+
+  // Combined function for check-in, mood tracking, and emotion recording 
+  Future<AttendanceResult> checkInWithEmotionTracking(String mood, {String? note}) async {
+    if (_userId == null) {
+      return AttendanceResult(
+        success: false,
+        message: 'You need to be logged in to check in',
+        streak: 0,
+      );
+    }
+    
+    // First mark attendance and get streak/reward information
+    final attendanceResult = await markAttendanceWithMood(mood);
+    
+    // If attendance check-in was successful, also record the emotion with optional note
+    if (attendanceResult.success) {
+      try {
+        final now = DateTime.now();
+        final dateStr = DateFormat('yyyy-MM-dd').format(now);
+        final timeStr = DateFormat('HH:mm:ss').format(now);
+        
+        // Create a record in the emotions collection
+        await _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('emotions')
+            .add({
+          'emotion': mood,
+          'note': note,
+          'date': dateStr,
+          'time': timeStr,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+        
+        print('DEBUG: Successfully recorded emotion with check-in: $mood');
+      } catch (e) {
+        print('Error recording emotion during check-in: $e');
+        // Continue anyway since the attendance was marked successfully
+      }
+    }
+    
+    return attendanceResult;
+  }
 }
 
 // Reward types

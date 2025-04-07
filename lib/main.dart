@@ -13,13 +13,13 @@ import 'package:logging/logging.dart';
 import 'screens/daily_tips_screen.dart';
 import 'dart:async';
 import 'widgets/animated_pet.dart';
-import 'widgets/animated_chat_bubble.dart';
 import 'widgets/happiness_meter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
-import 'screens/tests_list_screen.dart'; // Add this import
+import 'screens/tests_list_screen.dart'; 
 import 'services/attendance_service.dart';
+
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -33,6 +33,8 @@ import 'screens/chat_history_screen.dart';
 import 'screens/help_support_screen.dart';
 import 'screens/attendance_screen.dart';
 import 'screens/diary_screen.dart'; // Add this import
+import 'services/emotion_service.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -122,6 +124,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   int _happiness = 50;
   String _petStatus = 'Normal';
+  String? _currentMood;
   final TextEditingController _chatController = TextEditingController();
   final GeminiService _geminiService = GeminiService();
   final List<ChatMessage> _messages = [];
@@ -197,19 +200,6 @@ Pick one:
   ];
 
   List<Map<String, String>> _unusedTips = [];
-  final ScrollController _scrollController = ScrollController();
-
-  bool _hasCheckedInToday = false;
-  DateTime? _lastCheckInDate;
-  String? _currentMood;
-  final List<String> _moodOptions = [
-    '😊 Happy',
-    '😐 Neutral',
-    '😔 Sad',
-    '😰 Anxious',
-    '😴 Tired',
-    '🤔 Confused',
-  ];
 
   final List<String> _companionshipPrompts = [
     "How was your day? I'd love to hear about it!",
@@ -228,11 +218,8 @@ Pick one:
   int _breathingCount = 0;
 
   List<Map<String, dynamic>> _achievements = [];
-  bool _hasCompletedActivityToday = false;
   int _achievementPoints = 0;
   int _totalHappinessCoins = 0; // Add this line to track happiness coins
-
-  bool _isVisualizationActive = false;
 
   final Map<String, bool> _dailyRoutineItems = {
     "Morning check-in": false,
@@ -252,25 +239,24 @@ Pick one:
     "You have unique strengths that matter.",
   ];
 
-  bool _showInteractionsPanel = false;
+  final EmotionService _emotionService = EmotionService();
 
-  void _toggleInteractionsPanel() {
-    setState(() {
-      _showInteractionsPanel = !_showInteractionsPanel;
-    });
-  }
 
   @override
   void initState() {
     super.initState();
 
-    void _showInitialCheckIn() async {
+    void showInitialCheckIn() async {
       final attendanceService = AttendanceService();
 
       if (await attendanceService.shouldShowCheckInPrompt()) {
         if (!mounted) return;
 
-        _showMoodTracker(); // This uses your existing mood tracker dialog
+        // Navigate to the attendance screen instead of showing mood tracker
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => AttendanceScreen()),
+        );
       }
     }
 
@@ -279,7 +265,7 @@ Pick one:
 
     // Show check-in prompt after widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showInitialCheckIn();
+      showInitialCheckIn();
     });
 
     // Initialize pet status
@@ -288,41 +274,14 @@ Pick one:
     // Check connection to AI service
     _checkAIConnection();
 
-    // Start tip timer
+    // Optional: Keep basic tips for pet care
     _startTipTimer();
 
-    // Schedule routine check
-    Timer.periodic(const Duration(hours: 3), (timer) {
-      if (mounted) {
-        _checkRoutineProgress();
-      }
-    });
-
-    // Schedule random wellness prompts
-    Timer.periodic(const Duration(minutes: 45), (timer) {
+    // Schedule companionship prompts
+    Timer.periodic(const Duration(minutes: 60), (timer) {
       if (mounted && _currentResponse == null) {
-        // Choose a random support feature based on time of day and randomness
-        final now = DateTime.now();
         final rand = _random.nextDouble();
-
-        if (now.hour < 10 && rand < 0.3) {
-          // Morning: Routine reminder
-          _showRoutineTracker();
-        } else if (now.hour >= 10 && now.hour < 14 && rand < 0.3) {
-          // Mid-day: Stress relief
-          _showQuickStressRelief();
-        } else if (now.hour >= 14 && now.hour < 18 && rand < 0.3) {
-          // Afternoon: Small activity
-          _showSmallActivityPrompt();
-        } else if (now.hour >= 18 && rand < 0.3) {
-          // Evening: Affirmation or breathing
-          if (_random.nextBool()) {
-            _showAffirmation();
-          } else {
-            _startBreathingExercise();
-          }
-        } else if (rand < 0.2) {
-          // Random companionship prompt
+        if (rand < 0.4) {  // 40% chance each hour
           _showCompanionshipPrompt();
         }
       }
@@ -335,7 +294,6 @@ Pick one:
     _chatController.dispose();
     // Cancel any active exercises
     _isBreathingExerciseActive = false;
-    _isVisualizationActive = false;
     super.dispose();
   }
 
@@ -429,9 +387,12 @@ Pick one:
     final timeString =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
-    // Detect mood from the message
+    // Enhanced mood detection from the message
     final moodResult = _detectMoodFromText(userMessage);
-    final mightBeLonely = moodResult['lonely'] ?? false;
+    final hasEmotionalContent = moodResult['lonely'] == true || 
+                               moodResult['anxious'] == true || 
+                               moodResult['sad'] == true || 
+                               moodResult['angry'] == true;
     final detectedMood = moodResult['mood'];
 
     // Check for signs of distress in the message
@@ -450,13 +411,20 @@ Pick one:
     });
 
     try {
-      // Get response from AI service
-      final response = await _geminiService.getChatResponse(
-        userMessage,
-        _happiness,
-        _petStatus,
-        mightBeLonely,
-      );
+      String response;
+      
+      // Use the enhanced mental health response if emotional content is detected
+      if (hasEmotionalContent) {
+        response = await _geminiService.getMentalHealthResponse(userMessage, moodResult);
+      } else {
+        // Otherwise use the standard chat response
+        response = await _geminiService.getChatResponse(
+          userMessage,
+          _happiness,
+          _petStatus,
+          moodResult['lonely'] ?? false,
+        );
+      }
 
       // Store the response in history and show it
       if (mounted) {
@@ -466,12 +434,9 @@ Pick one:
           );
           _currentResponse = response;
 
-          // Adjust happiness based on detected mood
-          if (mightBeLonely) {
-            _happiness = min(
-              _happiness + 5,
-              100,
-            ); // Small happiness boost for sharing
+          // Adjust happiness based on detected mood - reward the user for sharing
+          if (hasEmotionalContent) {
+            _happiness = min(_happiness + 5, 100); // Happiness boost for emotional sharing
           }
 
           // Additional happiness adjustments based on detected mood
@@ -479,14 +444,16 @@ Pick one:
             if (detectedMood == 'positive') {
               _happiness = min(_happiness + 3, 100);
             } else if (detectedMood == 'negative') {
-              _happiness = max(_happiness - 2, 0);
+              // No negative adjustment - don't penalize negative emotions
+              // Instead give a small boost for sharing
+              _happiness = min(_happiness + 1, 100);
             }
           }
 
           _updatePetStatus();
         });
 
-        // Remove pet response after 15 seconds
+        // Remove pet response after a delay
         Future.delayed(const Duration(seconds: 15), () {
           if (mounted && _currentResponse == response) {
             setState(() {
@@ -674,101 +641,6 @@ Pick one:
     // Save to persistent storage (implement this later)
   }
 
-  void _startBreathingExercise() {
-    setState(() {
-      _isBreathingExerciseActive = true;
-      _breathingStep = 0;
-      _breathingCount = 0;
-      _currentResponse =
-          "Let's take a few deep breaths together. Follow my lead...";
-    });
-
-    // Start the breathing cycle
-    _runBreathingCycle();
-  }
-
-  void _runBreathingCycle() {
-    if (!_isBreathingExerciseActive || !mounted) return;
-
-    // Update the breathing instruction
-    setState(() {
-      switch (_breathingStep) {
-        case 0: // Inhale
-          _currentResponse = "Breathe in slowly... 1... 2... 3... 4...";
-          break;
-        case 1: // Hold
-          _currentResponse = "Hold... 1... 2... 3... 4...";
-          break;
-        case 2: // Exhale
-          _currentResponse = "Breathe out slowly... 1... 2... 3... 4...";
-          break;
-      }
-    });
-
-    // Move to next step after delay
-    Future.delayed(const Duration(seconds: 4), () {
-      if (!mounted || !_isBreathingExerciseActive) return;
-
-      setState(() {
-        _breathingStep = (_breathingStep + 1) % 3;
-
-        // If we completed a full cycle
-        if (_breathingStep == 0) {
-          _breathingCount++;
-
-          // End after 3 cycles
-          if (_breathingCount >= 3) {
-            _isBreathingExerciseActive = false;
-            _currentResponse =
-                "Great job! How do you feel now? Remember you can do this anytime you feel anxious.";
-
-            // Clear message after delay
-            Future.delayed(const Duration(seconds: 10), () {
-              if (mounted && _currentResponse?.contains("Great job") == true) {
-                setState(() {
-                  _currentResponse = null;
-                });
-              }
-            });
-            return;
-          }
-        }
-
-        // Continue the cycle
-        _runBreathingCycle();
-      });
-    });
-  }
-
-  void _startGroundingExercise() {
-    final groundingSteps = [
-      "Let's try a quick grounding exercise. Look around and find 5 things you can see.",
-      "Now, notice 4 things you can touch or feel.",
-      "Listen for 3 things you can hear right now.",
-      "Try to identify 2 things you can smell.",
-      "Finally, notice 1 thing you can taste.",
-      "Great job! This 5-4-3-2-1 technique can help you feel more present when anxious.",
-    ];
-
-    _runSequentialMessages(groundingSteps, const Duration(seconds: 8));
-  }
-
-  void _runSequentialMessages(
-    List<String> messages,
-    Duration delay, [
-    int index = 0,
-  ]) {
-    if (index >= messages.length || !mounted) return;
-
-    setState(() {
-      _currentResponse = messages[index];
-    });
-
-    Future.delayed(delay, () {
-      _runSequentialMessages(messages, delay, index + 1);
-    });
-  }
-
   void _addAchievement(
     String title, {
     IconData icon = Icons.star,
@@ -808,7 +680,6 @@ Pick one:
       }
     });
   }
-
   // Update happiness coins from achievements
   Future<void> _updateAchievementCoins(int points) async {
     final attendanceService = AttendanceService();
@@ -1392,6 +1263,7 @@ Pick one:
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_today),
+            tooltip: 'Daily Attendance',
             onPressed: () {
               Navigator.push(
                 context,
@@ -1401,6 +1273,7 @@ Pick one:
           ),
           IconButton(
             icon: const Icon(Icons.lightbulb_outline),
+            tooltip: 'Tips',
             onPressed: () {
               Navigator.push(
                 context,
@@ -1410,6 +1283,7 @@ Pick one:
           ),
           IconButton(
             icon: const Icon(Icons.history),
+            tooltip: 'Chat History',
             onPressed: () {
               Navigator.push(
                 context,
@@ -1528,7 +1402,12 @@ Pick one:
                                     _buildFeatureButton(
                                       icon: Icons.check_box,
                                       label: 'Check-In',
-                                      onPressed: _showMoodTracker,
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => AttendanceScreen()),
+                                        );
+                                      },
                                       color: Colors.blue,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
@@ -1585,10 +1464,10 @@ Pick one:
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     _buildFeatureButton(
-                                      icon: Icons.spa,
-                                      label: 'Wellness',
-                                      onPressed: _showStressReliefOptions,
-                                      color: Colors.green,
+                                      icon: Icons.pets,
+                                      label: 'Pet',
+                                      onPressed: _petThePet,
+                                      color: Colors.purple,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
                                     SizedBox(
@@ -1618,6 +1497,14 @@ Pick one:
                                       label: 'Interact',
                                       onPressed: _toggleInteractionsPanel,
                                       color: Colors.purple,
+                                    SizedBox(
+                                      width: constraints.maxWidth * 0.05,
+                                    ),
+                                    _buildFeatureButton(
+                                      icon: Icons.restaurant,
+                                      label: 'Feed',
+                                      onPressed: _feedThePet,
+                                      color: Colors.orange,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
                                     SizedBox(
@@ -1829,59 +1716,7 @@ Pick one:
                             ),
                           ),
                         ),
-
-                        // Interactions panel
-                        if (_showInteractionsPanel)
-                          Positioned(
-                            bottom: constraints.maxHeight * 0.05,
-                            left: 0,
-                            right: 0,
-                            child: Container(
-                              padding: EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 10,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  HappinessMeter(
-                                    happiness: _happiness,
-                                    status: _petStatus,
-                                  ),
-                                  SizedBox(height: 16),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      _buildActionButton(
-                                        onPressed: _petThePet,
-                                        icon: Icons.pets,
-                                        label: 'Pet',
-                                        color: Colors.purple,
-                                        size: screenSize.width * 0.1,
-                                      ),
-                                      _buildActionButton(
-                                        onPressed: _feedThePet,
-                                        icon: Icons.restaurant,
-                                        label: 'Feed',
-                                        color: Colors.orange,
-                                        size: screenSize.width * 0.1,
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ).animate().fadeIn(duration: 300.ms),
-                          ),
-
+                
                         // User's last message (only shown when there's a message)
                         if (_lastUserMessage != null)
                           Positioned(
@@ -2061,94 +1896,62 @@ Pick one:
     );
   }
 
+
   // Track consecutive negative chat messages
   int _consecutiveNegativeChats = 0;
+
+  // Enhanced mood detection for Gemini integration
+  Map<String, dynamic> _detectMoodFromText(String text) {
+    final result = {
+      'mood': null as String?,
+      'lonely': false,
+      'anxious': false,
+      'sad': false,
+      'angry': false,
+      'context': <String>[], // Initialize as a proper List<String>
+    };
 
   // Detect mood from a text message
   Map<String, dynamic> _detectMoodFromText(String text) {
     final lowerText = text.toLowerCase();
 
-    // Words indicating possible loneliness
-    final lonelyWords = [
-      'alone',
-      'lonely',
-      'no one',
-      'by myself',
-      'no friends',
-      'miss',
-      'missing',
-      'abandoned',
-      'empty',
-      'isolated',
-      'excluded',
-      'left out',
+    // Detect loneliness
+    final lonelyKeywords = [
+      'lonely', 'alone', 'no one', 'by myself', 'no friends', 'isolated', 
+      'abandoned', 'nobody', 'miss', 'missing', 'empty',
     ];
 
-    // Words indicating sadness
-    final sadWords = [
-      'sad',
-      'unhappy',
-      'depressed',
-      'down',
-      'blue',
-      'upset',
-      'cry',
-      'crying',
-      'tears',
-      'heartbroken',
-      'devastated',
-      'miserable',
-      'grief',
+    // Detect anxiety
+    final anxiousKeywords = [
+      'anxious', 'nervous', 'worry', 'worried', 'stress', 'stressed', 
+      'panic', 'fear', 'afraid', 'scared', 'overwhelming', 'overthinking',
     ];
 
-    // Words indicating anxiety
-    final anxiousWords = [
-      'anxious',
-      'worried',
-      'panic',
-      'stress',
-      'nervous',
-      'fear',
-      'scared',
-      'afraid',
-      'uneasy',
-      'tense',
-      'dread',
-      'frightened',
-      'terrified',
+    // Detect sadness
+    final sadKeywords = [
+      'sad', 'unhappy', 'depressed', 'down', 'blue', 'miserable', 
+      'heartbroken', 'upset', 'cry', 'crying', 'hopeless', 'lost',
     ];
 
-    // Words indicating anger
-    final angryWords = [
-      'angry',
-      'mad',
-      'furious',
-      'rage',
-      'hate',
-      'annoyed',
-      'frustrated',
-      'irritated',
-      'upset',
-      'outraged',
-      'livid',
-      'hostile',
+    // Detect anger
+    final angryKeywords = [
+      'angry', 'mad', 'furious', 'rage', 'hate', 'annoyed', 
+      'irritated', 'frustrated', 'upset', 'pissed',
     ];
 
-    // Words indicating happiness
-    final happyWords = [
-      'happy',
-      'glad',
-      'joy',
-      'excited',
-      'thrilled',
-      'pleased',
-      'delighted',
-      'content',
-      'cheerful',
-      'great',
-      'wonderful',
-      'fantastic',
-      'awesome',
+    // Detect positive emotions
+    final positiveKeywords = [
+      'happy', 'joy', 'excited', 'great', 'good', 'wonderful', 
+      'fantastic', 'amazing', 'love', 'glad', 'blessed', 'grateful',
+    ];
+
+    // Context patterns to detect
+    final contextPatterns = [
+      {'pattern': ['school', 'class', 'homework', 'study', 'exam', 'test'], 'context': 'education'},
+      {'pattern': ['work', 'job', 'boss', 'colleague', 'meeting', 'deadline'], 'context': 'work'},
+      {'pattern': ['friend', 'relationship', 'date', 'breakup', 'family', 'parent'], 'context': 'relationships'},
+      {'pattern': ['tired', 'sleep', 'insomnia', 'exhausted', 'rest', 'fatigue'], 'context': 'sleep/energy'},
+      {'pattern': ['health', 'sick', 'pain', 'doctor', 'hospital', 'illness'], 'context': 'health'},
     ];
 
     // Check for emotions in the text
@@ -2176,25 +1979,31 @@ Pick one:
       _consecutiveNegativeChats = 0; // Reset on positive messages
     }
 
-    // Determine overall mood
-    String mood = 'Neutral';
-    if (isHappy)
-      mood = 'Happy';
-    else if (isSad)
-      mood = 'Sad';
-    else if (isAnxious)
-      mood = 'Anxious';
-    else if (isAngry)
-      mood = 'Angry';
+    // Detect context
+    for (final contextData in contextPatterns) {
+      for (final keyword in contextData['pattern'] as List<String>) {
+        if (lowerText.contains(keyword)) {
+          // Now we can safely add to the list
+          (result['context'] as List<String>).add(contextData['context'] as String);
+          break;
+        }
+      }
+    }
 
-    return {
-      'mood': mood,
-      'lonely': isLonely,
-      'sad': isSad,
-      'anxious': isAnxious,
-      'angry': isAngry,
-      'happy': isHappy,
-    };
+    if (result['lonely'] == true || result['anxious'] == true || 
+        result['sad'] == true || result['angry'] == true) {
+      result['mood'] = 'negative';
+    } else {
+      // Check for positive emotions
+      for (final keyword in positiveKeywords) {
+        if (lowerText.contains(keyword)) {
+          result['mood'] = 'positive';
+          break;
+        }
+      }
+    }
+
+    return result;
   }
 
   void _showAchievements() {
@@ -2268,211 +2077,6 @@ Pick one:
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text('Close', style: GoogleFonts.fredoka()),
-              ),
-            ],
-          ),
-    );
-  }
-
-  // Add this method for quick stress relief
-  void _showStressReliefOptions() {
-    final reliefOptions = [
-      {
-        "title": "Box Breathing",
-        "description":
-            "Breathe in for 4 counts, hold for 4, exhale for 4, hold for 4. Repeat 3 times.",
-        "icon": Icons.air,
-        "color": Colors.blue,
-      },
-      {
-        "title": "Progressive Relaxation",
-        "description":
-            "Tense and then relax each muscle group, starting from your toes and moving up.",
-        "icon": Icons.spa,
-        "color": Colors.green,
-      },
-      {
-        "title": "5-4-3-2-1 Grounding",
-        "description":
-            "Notice 5 things you see, 4 things you feel, 3 things you hear, 2 things you smell, 1 thing you taste.",
-        "icon": Icons.nature,
-        "color": Colors.teal,
-      },
-      {
-        "title": "Quick Visualization",
-        "description":
-            "Close your eyes and imagine a peaceful place for 30 seconds. Notice the details.",
-        "icon": Icons.cloud,
-        "color": Colors.purple,
-      },
-    ];
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(
-              'Stress Relief Techniques',
-              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            content: Container(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Choose a quick technique:',
-                    style: GoogleFonts.fredoka(),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 15),
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: reliefOptions.length,
-                      itemBuilder: (context, index) {
-                        final option = reliefOptions[index];
-                        return ListTile(
-                          leading: Icon(
-                            option["icon"] as IconData,
-                            color: option["color"] as Color,
-                          ),
-                          title: Text(
-                            option["title"] as String,
-                            style: GoogleFonts.fredoka(
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          subtitle: Text(
-                            option["description"] as String,
-                            style: GoogleFonts.fredoka(fontSize: 12),
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _addAchievement(
-                              "Used ${option["title"]} technique",
-                              icon: option["icon"] as IconData,
-                              color: option["color"] as Color,
-                            );
-
-                            // Show confirmation
-                            setState(() {
-                              _currentResponse =
-                                  "Great job using the ${option["title"]} technique! How do you feel now?";
-                            });
-
-                            // Clear message after delay
-                            Future.delayed(const Duration(seconds: 10), () {
-                              if (mounted &&
-                                  _currentResponse?.contains(
-                                        option["title"] as String,
-                                      ) ==
-                                      true) {
-                                setState(() {
-                                  _currentResponse = null;
-                                });
-                              }
-                            });
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Maybe Later', style: GoogleFonts.fredoka()),
-              ),
-            ],
-          ),
-    );
-  }
-
-  // Add this method for self-esteem building
-  void _showSelfEsteemBuilder() {
-    final prompts = [
-      "What's one small thing you like about yourself?",
-      "What's something you did well recently, no matter how small?",
-      "What's a challenge you've overcome in the past?",
-      "What's a quality your friends might appreciate about you?",
-      "What's a small act of kindness you've done recently?",
-    ];
-
-    final prompt = prompts[_random.nextInt(prompts.length)];
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(
-              'Positive Reflection',
-              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  prompt,
-                  style: GoogleFonts.fredoka(),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 15),
-                TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Your thoughts...',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                  textAlign: TextAlign.center,
-                  onSubmitted: (value) {
-                    if (value.isNotEmpty) {
-                      Navigator.pop(context);
-                      _addAchievement(
-                        "Completed a positive reflection",
-                        icon: Icons.favorite,
-                        color: Colors.red,
-                        points: 10,
-                      );
-
-                      // Pet responds with encouragement
-                      setState(() {
-                        _currentResponse =
-                            "That's wonderful! Thank you for sharing that with me. You should be proud of yourself!";
-                      });
-
-                      // Clear message after delay
-                      Future.delayed(const Duration(seconds: 10), () {
-                        if (mounted &&
-                            _currentResponse?.contains("That's wonderful") ==
-                                true) {
-                          setState(() {
-                            _currentResponse = null;
-                          });
-                        }
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Recognizing your positive qualities builds self-esteem!',
-                  style: GoogleFonts.fredoka(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Maybe Later', style: GoogleFonts.fredoka()),
               ),
             ],
           ),
@@ -2685,69 +2289,52 @@ Pick one:
   }
 
   void _recordMood(String mood) {
+    print('DEBUG: _recordMood called with mood: $mood');
+    
+    // Update local state
+    _currentMood = mood;
+      
+    // Generate response based on mood
+    String response;
+    if (mood == "Happy" || mood == "Calm") {
+      response = "I'm glad you're feeling $mood today! That's wonderful!";
+      _happiness = min(_happiness + 5, 100);
+    } else if (mood == "Sad" || mood == "Angry" || mood == "Anxious") {
+      response = "I see you're feeling $mood. Remember I'm here for you.";
+      // Give a smaller happiness boost for sharing difficult emotions
+      _happiness = min(_happiness + 2, 100);
+    } else {
+      response = "Thanks for sharing how you're feeling today!";
+      _happiness = min(_happiness + 3, 100);
+    }
+    
+    // Update UI with response
     setState(() {
-      // Update pet response based on mood
-      if (mood == "Happy" || mood == "Calm") {
-        _currentResponse =
-            "I'm glad you're feeling $mood today! That's wonderful!";
-      } else if (mood == "Sad" || mood == "Angry" || mood == "Anxious") {
-        _currentResponse =
-            "I see you're feeling $mood. Remember I'm here for you. Would you like to try a quick wellness activity?";
-        // Optionally suggest relevant wellness activities
-        Future.delayed(const Duration(seconds: 5), () {
-          if (mounted && _currentResponse?.contains(mood) == true) {
-            _showRelevantWellnessOptions(mood);
-          }
-        });
-      } else {
-        _currentResponse = "Thanks for sharing how you're feeling today!";
-      }
-
-      // Add achievement for tracking mood
-      _addAchievement(
-        "Tracked daily mood",
-        icon: Icons.mood,
-        color: Colors.blue,
-        points: 3,
-      );
-
-      // Store mood in history
-      // You would implement this based on your data storage approach
+      _currentResponse = response;
+      _updatePetStatus();
     });
-  }
-
-  void _recordMoodDetails(String details) {
-    // Store additional mood details
-    // You would implement this based on your data storage approach
-
-    // Pet responds to details
-    _geminiService.getCheckInResponse(details).then((response) {
-      setState(() {
-        _currentResponse = response;
-      });
-
-      // Clear message after delay
-      Future.delayed(const Duration(seconds: 15), () {
-        if (mounted && _currentResponse == response) {
+    
+    // Send mood to Gemini service for contextual awareness in future interactions
+    _geminiService.getCheckInResponse(mood).then((aiResponse) {
+      // Update the response after a small delay to show the initial acknowledgment first
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
           setState(() {
-            _currentResponse = null;
+            _currentResponse = aiResponse;
+            
+            // Clear message after delay
+            Future.delayed(const Duration(seconds: 12), () {
+              if (mounted && _currentResponse == aiResponse) {
+                setState(() {
+                  _currentResponse = null;
+                });
+              }
+            });
           });
         }
       });
     });
   }
-
-  void _showRelevantWellnessOptions(String mood) {
-    // Show relevant wellness activities based on mood
-    if (mood == "Anxious") {
-      _showStressReliefOptions();
-    } else if (mood == "Sad") {
-      _showSelfEsteemBuilder();
-    } else if (mood == "Angry") {
-      _startBreathingExercise();
-    }
-  }
-
   // Method to detect user distress and offer help resources
   void _checkUserDistress(String message, String mood) {
     // List of high-risk critical keywords that require immediate attention
@@ -2975,6 +2562,7 @@ Pick one:
       });
     }
   }
+
 }
 
 class BubbleTrianglePainter extends CustomPainter {
@@ -2997,46 +2585,6 @@ class BubbleTrianglePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class PetPainter extends CustomPainter {
-  final Color color;
-
-  PetPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint =
-        Paint()
-          ..color = color
-          ..style = PaintingStyle.fill;
-
-    final pixelSize = size.width / 8;
-    final pixels = [
-      [0, 0, 1, 1, 1, 1, 0, 0],
-      [0, 1, 1, 1, 1, 1, 1, 0],
-      [1, 1, 0, 1, 1, 0, 1, 1],
-      [1, 1, 1, 1, 1, 1, 1, 1],
-      [1, 1, 1, 1, 1, 1, 1, 1],
-      [0, 1, 1, 1, 1, 1, 1, 0],
-      [0, 0, 1, 0, 0, 1, 0, 0],
-      [0, 0, 1, 1, 1, 1, 0, 0],
-    ];
-
-    for (var y = 0; y < pixels.length; y++) {
-      for (var x = 0; x < pixels[y].length; x++) {
-        if (pixels[y][x] == 1) {
-          canvas.drawRect(
-            Rect.fromLTWH(x * pixelSize, y * pixelSize, pixelSize, pixelSize),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
 class ChatMessage {
