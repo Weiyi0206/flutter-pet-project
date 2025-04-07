@@ -130,6 +130,18 @@ class _MyHomePageState extends State<MyHomePage> {
   final List<ChatMessage> _messages = [];
   String? _currentResponse;
   String? _lastUserMessage;
+  bool _isVisualizationActive = false;
+  bool _hasCompletedActivityToday = false;
+  int _consecutiveNegativeChats = 0;
+  final int _negativeThreshold = 3;
+  int _consecutiveNegativeMoods = 0;
+
+  // Emotion detection keywords
+  final List<String> lonelyWords = ['lonely', 'alone', 'no one', 'by myself', 'no friends', 'isolated'];
+  final List<String> sadWords = ['sad', 'unhappy', 'depressed', 'down', 'blue', 'miserable'];
+  final List<String> anxiousWords = ['anxious', 'nervous', 'worry', 'worried', 'stress', 'stressed'];
+  final List<String> angryWords = ['angry', 'mad', 'furious', 'rage', 'hate', 'annoyed'];
+  final List<String> happyWords = ['happy', 'joy', 'excited', 'great', 'good', 'wonderful'];
 
   Timer? _tipTimer;
   final Random _random = Random();
@@ -1021,225 +1033,6 @@ Pick one:
     );
   }
 
-  void _showMentalHealthTools() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder:
-          (context) => Container(
-            padding: const EdgeInsets.all(20),
-            height: MediaQuery.of(context).size.height * 0.7,
-            child: Column(
-              children: [
-                Text(
-                  'Wellness Tools',
-                  style: GoogleFonts.fredoka(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  'Tools to support your mental wellbeing',
-                  style: GoogleFonts.fredoka(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-
-                // Categories
-                Row(
-                  children: [
-                    _buildCategoryTab(
-                      icon: Icons.sentiment_satisfied_alt,
-                      label: 'Mood',
-                      color: Colors.blue,
-                    ),
-                    _buildCategoryTab(
-                      icon: Icons.spa,
-                      label: 'Calm',
-                      color: Colors.green,
-                    ),
-                    _buildCategoryTab(
-                      icon: Icons.psychology,
-                      label: 'Mind',
-                      color: Colors.purple,
-                    ),
-                    _buildCategoryTab(
-                      icon: Icons.favorite,
-                      label: 'Self',
-                      color: Colors.red,
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-                Expanded(
-                  child: GridView.count(
-                    crossAxisCount: 3,
-                    childAspectRatio: 0.85,
-                    crossAxisSpacing: 15,
-                    mainAxisSpacing: 15,
-                    children: [
-                      _buildToolButton(
-                        icon: Icons.air,
-                        label: 'Breathing',
-                        color: Colors.blue,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _startBreathingExercise();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.spa,
-                        label: 'Grounding',
-                        color: Colors.green,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _startGroundingExercise();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.psychology,
-                        label: 'Small Win',
-                        color: Colors.purple,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showSmallActivityPrompt();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.beach_access,
-                        label: 'Visualize',
-                        color: Colors.orange,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _startVisualizationExercise();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.schedule,
-                        label: 'Routine',
-                        color: Colors.indigo,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showRoutineTracker();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.favorite,
-                        label: 'Affirmation',
-                        color: Colors.red,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showAffirmation();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.fitness_center,
-                        label: 'Stress Relief',
-                        color: Colors.teal,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showStressReliefOptions();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.star,
-                        label: 'Strengths',
-                        color: Colors.amber,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showSelfEsteemBuilder();
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.emoji_events,
-                        label: 'Achievements',
-                        color: Colors.deepOrange,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showAchievements();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  Widget _buildCategoryTab({
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: color, width: 3)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: GoogleFonts.fredoka(
-                color: color,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToolButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          border: Border(
-            right: BorderSide(color: Colors.grey.shade300, width: 1),
-          ),
-        ),
-        child: TextButton(
-          onPressed: onPressed,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: GoogleFonts.fredoka(
-                  color: color,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1488,15 +1281,7 @@ Pick one:
                                       },
                                       color: Colors.indigo,
                                       size: isSmallScreen ? 40 : 50,
-                                    ),
-                                    SizedBox(
-                                      width: constraints.maxWidth * 0.05,
-                                    ),
-                                    _buildFeatureButton(
-                                      icon: Icons.pets,
-                                      label: 'Interact',
-                                      onPressed: _toggleInteractionsPanel,
-                                      color: Colors.purple,
+                                    ),                                  
                                     SizedBox(
                                       width: constraints.maxWidth * 0.05,
                                     ),
@@ -1511,11 +1296,9 @@ Pick one:
                                       width: constraints.maxWidth * 0.05,
                                     ),
                                     _buildFeatureButton(
-                                      onPressed: () {
-                                        _showCompanionshipPrompt();
-                                      },
                                       icon: Icons.chat_bubble_outline,
                                       label: 'Talk to Me',
+                                      onPressed: _showCompanionshipPrompt,
                                       color: Colors.blue,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
@@ -1896,10 +1679,6 @@ Pick one:
     );
   }
 
-
-  // Track consecutive negative chat messages
-  int _consecutiveNegativeChats = 0;
-
   // Enhanced mood detection for Gemini integration
   Map<String, dynamic> _detectMoodFromText(String text) {
     final result = {
@@ -1908,51 +1687,10 @@ Pick one:
       'anxious': false,
       'sad': false,
       'angry': false,
-      'context': <String>[], // Initialize as a proper List<String>
+      'context': <String>[],
     };
 
-  // Detect mood from a text message
-  Map<String, dynamic> _detectMoodFromText(String text) {
     final lowerText = text.toLowerCase();
-
-    // Detect loneliness
-    final lonelyKeywords = [
-      'lonely', 'alone', 'no one', 'by myself', 'no friends', 'isolated', 
-      'abandoned', 'nobody', 'miss', 'missing', 'empty',
-    ];
-
-    // Detect anxiety
-    final anxiousKeywords = [
-      'anxious', 'nervous', 'worry', 'worried', 'stress', 'stressed', 
-      'panic', 'fear', 'afraid', 'scared', 'overwhelming', 'overthinking',
-    ];
-
-    // Detect sadness
-    final sadKeywords = [
-      'sad', 'unhappy', 'depressed', 'down', 'blue', 'miserable', 
-      'heartbroken', 'upset', 'cry', 'crying', 'hopeless', 'lost',
-    ];
-
-    // Detect anger
-    final angryKeywords = [
-      'angry', 'mad', 'furious', 'rage', 'hate', 'annoyed', 
-      'irritated', 'frustrated', 'upset', 'pissed',
-    ];
-
-    // Detect positive emotions
-    final positiveKeywords = [
-      'happy', 'joy', 'excited', 'great', 'good', 'wonderful', 
-      'fantastic', 'amazing', 'love', 'glad', 'blessed', 'grateful',
-    ];
-
-    // Context patterns to detect
-    final contextPatterns = [
-      {'pattern': ['school', 'class', 'homework', 'study', 'exam', 'test'], 'context': 'education'},
-      {'pattern': ['work', 'job', 'boss', 'colleague', 'meeting', 'deadline'], 'context': 'work'},
-      {'pattern': ['friend', 'relationship', 'date', 'breakup', 'family', 'parent'], 'context': 'relationships'},
-      {'pattern': ['tired', 'sleep', 'insomnia', 'exhausted', 'rest', 'fatigue'], 'context': 'sleep/energy'},
-      {'pattern': ['health', 'sick', 'pain', 'doctor', 'hospital', 'illness'], 'context': 'health'},
-    ];
 
     // Check for emotions in the text
     final isLonely = lonelyWords.any((word) => lowerText.contains(word));
@@ -1961,126 +1699,35 @@ Pick one:
     final isAngry = angryWords.any((word) => lowerText.contains(word));
     final isHappy = happyWords.any((word) => lowerText.contains(word));
 
+    // Update result based on detected emotions
+    result['lonely'] = isLonely;
+    result['sad'] = isSad;
+    result['anxious'] = isAnxious;
+    result['angry'] = isAngry;
+
+    if (isLonely || isSad || isAnxious || isAngry) {
+      result['mood'] = 'negative';
+    } else if (isHappy) {
+      result['mood'] = 'positive';
+    }
+
     // Track consecutive negative messages for potential interventions
     if (isSad || isAnxious || isAngry || isLonely) {
       _consecutiveNegativeChats++;
 
-      // If user has had several negative chat messages in a row, consider suggesting help
       if (_consecutiveNegativeChats >= _negativeThreshold) {
-        // Schedule the help suggestion for after the AI response
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
             _showHelpSuggestion();
           }
         });
-        _consecutiveNegativeChats = 0; // Reset after showing help
+        _consecutiveNegativeChats = 0;
       }
     } else if (isHappy) {
-      _consecutiveNegativeChats = 0; // Reset on positive messages
-    }
-
-    // Detect context
-    for (final contextData in contextPatterns) {
-      for (final keyword in contextData['pattern'] as List<String>) {
-        if (lowerText.contains(keyword)) {
-          // Now we can safely add to the list
-          (result['context'] as List<String>).add(contextData['context'] as String);
-          break;
-        }
-      }
-    }
-
-    if (result['lonely'] == true || result['anxious'] == true || 
-        result['sad'] == true || result['angry'] == true) {
-      result['mood'] = 'negative';
-    } else {
-      // Check for positive emotions
-      for (final keyword in positiveKeywords) {
-        if (lowerText.contains(keyword)) {
-          result['mood'] = 'positive';
-          break;
-        }
-      }
+      _consecutiveNegativeChats = 0;
     }
 
     return result;
-  }
-
-  void _showAchievements() {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(
-              'Your Achievements',
-              style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            content: Container(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Achievement Points: $_achievementPoints',
-                    style: GoogleFonts.fredoka(
-                      fontSize: 18,
-                      color: Colors.amber.shade800,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  if (_achievements.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Text(
-                        'Complete wellness activities to earn achievements!',
-                        style: GoogleFonts.fredoka(color: Colors.grey.shade600),
-                        textAlign: TextAlign.center,
-                      ),
-                    )
-                  else
-                    Flexible(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _achievements.length,
-                        itemBuilder: (context, index) {
-                          final achievement = _achievements[index];
-                          return ListTile(
-                            leading: Icon(
-                              achievement['icon'] as IconData,
-                              color: achievement['color'] as Color,
-                            ),
-                            title: Text(
-                              achievement['title'] as String,
-                              style: GoogleFonts.fredoka(),
-                            ),
-                            subtitle: Text(
-                              achievement['date'] as String,
-                              style: GoogleFonts.fredoka(fontSize: 12),
-                            ),
-                            trailing: Text(
-                              '+${achievement['points']}',
-                              style: GoogleFonts.fredoka(
-                                color: Colors.amber.shade800,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Close', style: GoogleFonts.fredoka()),
-              ),
-            ],
-          ),
-    );
   }
 
   Widget _buildFeatureButton({
@@ -2088,38 +1735,7 @@ Pick one:
     required IconData icon,
     required String label,
     required Color color,
-    required double size,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: Icon(icon, color: color),
-            onPressed: onPressed,
-            iconSize: size * 0.6,
-            padding: EdgeInsets.all(size * 0.2),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.fredoka(fontSize: 12, color: Colors.grey.shade700),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionButton({
-    required VoidCallback onPressed,
-    required IconData icon,
-    required String label,
-    required Color color,
-    required double size,
+    double size = 50,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -2244,12 +1860,6 @@ Pick one:
                               _loadHappinessCoins();
                             }
                           },
-                          // onTap:
-                          // () {
-                          //   // Record the selected mood
-                          //   _recordMood(mood['label'] as String);
-                          //   Navigator.pop(context);
-                          // };
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -2418,11 +2028,6 @@ Pick one:
     }
   }
 
-  // Keep track of consecutive negative mood check-ins
-  int _consecutiveNegativeMoods = 0;
-  final int _negativeThreshold =
-      3; // Show suggestion after 3 consecutive negative moods
-
   // Update negative mood counter and check if we should suggest help
   void _updateMoodTracking(String mood) {
     final negativeMoods = ['Sad', 'Angry', 'Anxious'];
@@ -2548,7 +2153,6 @@ Pick one:
 
   // Method to be called when processing chat messages
   void _processChatMessage(String message) {
-    // Pass an empty mood since this is from chat, not check-in
     _checkUserDistress(message, '');
   }
 
@@ -2563,6 +2167,42 @@ Pick one:
     }
   }
 
+  void _startBreathingExercise() {
+    // Implementation for breathing exercise
+  }
+
+  void _startGroundingExercise() {
+    // Implementation for grounding exercise
+  }
+
+  void _showStressReliefOptions() {
+    // Implementation for stress relief options
+  }
+
+  void _showSelfEsteemBuilder() {
+    // Implementation for self esteem builder
+  }
+
+  void _toggleInteractionsPanel() {
+    // Implementation for toggling interactions panel
+  }
+
+  void _runSequentialMessages(List<String> messages, Duration delay) {
+    // Implementation for running sequential messages
+  }
+
+}
+
+class ChatMessage {
+  final String text;
+  final bool isUser;
+  final String timestamp;
+
+  ChatMessage({
+    required this.text,
+    required this.isUser,
+    required this.timestamp,
+  });
 }
 
 class BubbleTrianglePainter extends CustomPainter {
@@ -2585,16 +2225,4 @@ class BubbleTrianglePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class ChatMessage {
-  final String text;
-  final bool isUser;
-  final String timestamp;
-
-  ChatMessage({
-    required this.text,
-    required this.isUser,
-    required this.timestamp,
-  });
 }

@@ -330,6 +330,7 @@ class AttendanceService {
         success: false,
         message: 'You need to be logged in to check in',
         streak: 0,
+        totalCoins: 0,
       );
     }
     
