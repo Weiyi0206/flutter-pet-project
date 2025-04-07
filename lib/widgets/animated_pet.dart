@@ -592,30 +592,61 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
   }
   
   Widget _buildMouth(double width) {
+    final int happiness = widget.petData?['happiness'] as int? ?? 60;
+    print('--- buildMouth: Happiness = $happiness, Status = ${widget.status}, IsPet = $_isBeingPet ---');
+
     if (_isBeingFed) {
-      return Container(
-        width: width * 0.6,
-        height: width * 0.4,
-        decoration: BoxDecoration(
-          color: Colors.pink.shade200,
-          borderRadius: BorderRadius.circular(width * 0.2),
-          border: Border.all(color: _getStatusColor().darker(30), width: 1.0),
-        ),
-      ).animate(onPlay: (c)=> c.repeat(reverse: true, count: 2))
-        .scaleXY(begin: 1.0, end: 1.5, duration: 150.ms, curve: Curves.easeOut)
-        .then(delay: 50.ms)
-        .scaleXY(end: 0.8, duration: 150.ms, curve: Curves.easeIn);
-    } else if (_isUnhappy) {
+       // Keep feeding mouth animation
+       return Container(
+         width: width * 0.6,
+         height: width * 0.4,
+         decoration: BoxDecoration(
+           color: Colors.pink.shade200,
+           borderRadius: BorderRadius.circular(width * 0.2),
+           border: Border.all(color: _getStatusColor().darker(30), width: 1.0),
+         ),
+       ).animate(onPlay: (c)=> c.repeat(reverse: true, count: 2))
+         .scaleXY(begin: 1.0, end: 1.5, duration: 150.ms, curve: Curves.easeOut)
+         .then(delay: 50.ms)
+         .scaleXY(end: 0.8, duration: 150.ms, curve: Curves.easeIn);
+    }
+    else if (happiness >= 100) {
+       return CustomPaint(
+         size: Size(width * 1.2, width * 0.5),
+         painter: _MouthPainter(
+           isHappy: true,
+           mouthWidth: width * 1.2,
+           color: _getStatusColor().darker(30),
+           curvature: 1.8,
+         ),
+       );
+    } else if (happiness == 0) {
+       // Min Happiness: Big Frown
+       return CustomPaint(
+         size: Size(width * 0.9, width * 0.4), // Standard frown size
+         painter: _MouthPainter(
+           isHappy: false,
+           mouthWidth: width * 0.9,
+           color: _getStatusColor().darker(40),
+           curvature: 1.8, // Extra curvy frown
+         ),
+       );
+    }
+    // --- END NEW CHECKS ---
+    else if (_isUnhappy) { // Use the existing getter for sad range (1-40)
+      // Standard Frown
       return CustomPaint(
         size: Size(width, width * 0.3),
         painter: _MouthPainter(isHappy: false, mouthWidth: width, color: _getStatusColor().darker(40), curvature: 1.0),
       );
-    } else if (widget.status == 'Happy' || widget.status == 'Ecstatic' || _isBeingPet) {
+    } else if (widget.status == 'Happy' || widget.status == 'Ecstatic' || _isBeingPet) { // Includes pet interaction smile
+       // Standard Smile (covers 75-99 and Petting)
       return CustomPaint(
         size: Size(width * 1.1, width * 0.4),
         painter: _MouthPainter(isHappy: true, mouthWidth: width * 1.1, color: _getStatusColor().darker(30), curvature: 1.2),
       );
     } else {
+      // Neutral mouth (covers 41-74 approx)
       return Container(
         width: width * 0.4,
         height: 1.5,
@@ -962,21 +993,43 @@ class _MouthPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
-      
-    final path = Path();
-    final startY = isHappy ? size.height * 0.1 : size.height * 0.9;
-    final endY = isHappy ? size.height * 0.1 : size.height * 0.9;
-    final controlY = isHappy ? -size.height * 0.4 * curvature : size.height * 1.4 * curvature;
 
-    path.moveTo(0, startY);
-    path.quadraticBezierTo(
-      size.width / 2,
-      isHappy ? 0 : size.height,
-      size.width,
-      endY,
+    final double rectWidth = size.width;
+    final double rectHeight = math.max(size.height * 0.5, size.height * curvature * 0.8);
+
+    final Rect rect;
+    if (isHappy) {
+      rect = Rect.fromCenter(
+        center: Offset(size.width / 2, rectHeight * 0.05),
+        width: rectWidth,
+        height: rectHeight,
+      );
+    } else {
+      rect = Rect.fromCenter(
+        center: Offset(size.width / 2, size.height - rectHeight * 0.5),
+        width: rectWidth,
+        height: rectHeight,
+      );
+    }
+
+    final double startAngle;
+    final double sweepAngle;
+
+    if (isHappy) {
+      startAngle = math.pi * 0.1;
+      sweepAngle = math.pi * 0.8;
+    } else {
+      startAngle = math.pi * -0.1;
+      sweepAngle = math.pi * -0.8;
+    }
+
+    canvas.drawArc(
+      rect,
+      startAngle,
+      sweepAngle,
+      false,
+      paint,
     );
-    
-    canvas.drawPath(path, paint);
   }
   
   @override
