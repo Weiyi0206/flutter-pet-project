@@ -16,12 +16,11 @@ import 'widgets/animated_pet.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
-import 'screens/tests_list_screen.dart'; 
+import 'screens/tests_list_screen.dart';
 import 'services/attendance_service.dart';
 import 'screens/diary_screen.dart'; // Add this import
 import 'services/emotion_service.dart';
 import 'models/pet_model.dart';
-import 'screens/pet_interactions_screen.dart';
 
 
 void main() async {
@@ -674,29 +673,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                             ),
                                           ),
                                       color: Colors.red,
-                                      size: isSmallScreen ? 40 : 50,
-                                    ),
-                                    _buildFeatureButton(
-                                      icon: Icons.pets,
-                                      label: 'Pet Care',
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => PetInteractionsScreen(
-                                              petModel: _petModel,
-                                              petData: _petData,
-                                              onPetDataUpdate: (updatedData) {
-                                                setState(() {
-                                                  _petData = updatedData;
-                                                  _updatePetStatus();
-                                                });
-                                              },
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      color: Colors.purple,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
                                     _buildFeatureButton(
