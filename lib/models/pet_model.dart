@@ -48,6 +48,9 @@ class PetModel {
     // --- Task fields ---
     'dailyTaskStatus': <String, bool>{},
     'lastTaskStatusResetDate': null,
+
+    // --- ADDED: Timestamp for hourly decay ---
+    'lastHappinessUpdateTime': null,
   };
 
   // Initialize pet data
@@ -55,7 +58,7 @@ class PetModel {
     final docRef = _firestore.collection('pets').doc(_userId);
     final doc = await docRef.get();
     if (!doc.exists) {
-      // Set initial values, remove deleted ones
+      // Set initial values
       _petData['lastPetDate'] = FieldValue.serverTimestamp();
       _petData['lastFeedDate'] = FieldValue.serverTimestamp();
       _petData['petsToday'] = 0;
@@ -66,16 +69,17 @@ class PetModel {
       _petData['playsToday'] = 0;
       _petData['lastGroomDate'] = FieldValue.serverTimestamp();
       _petData['groomsToday'] = 0;
-      // --- Set default happiness/mood ---
       _petData['happiness'] = 80;
       _petData['mood'] = 'Content';
+      // --- ADD initial value for new timestamp ---
+      _petData['lastHappinessUpdateTime'] = FieldValue.serverTimestamp();
       await docRef.set(_petData);
     } else {
-       // Ensure existing documents have the fields, add missing ones
+       // Ensure existing documents have the fields
        Map<String, dynamic> data = doc.data() ?? {};
        Map<String, dynamic> updates = {};
-       if (data['happiness'] == null) updates['happiness'] = 80; // Add default if missing
-       if (data['mood'] == null) updates['mood'] = 'Content'; // Add default if missing
+       if (data['happiness'] == null) updates['happiness'] = 80;
+       if (data['mood'] == null) updates['mood'] = 'Content';
        if (data['petsToday'] == null) updates['petsToday'] = 0;
        if (data['lastPetDate'] == null) updates['lastPetDate'] = FieldValue.serverTimestamp();
        if (data['mealsToday'] == null) updates['mealsToday'] = 0;
@@ -89,7 +93,12 @@ class PetModel {
        if (data['groomsToday'] == null) updates['groomsToday'] = 0;
        if (data['lastGroomDate'] == null) updates['lastGroomDate'] = FieldValue.serverTimestamp();
 
-       // Remove obsolete fields if they exist
+       // --- ADD check for the new timestamp ---
+       if (data['lastHappinessUpdateTime'] == null) {
+         updates['lastHappinessUpdateTime'] = FieldValue.serverTimestamp();
+       }
+
+       // Remove obsolete fields
        if (data.containsKey('energy')) updates['energy'] = FieldValue.delete();
        if (data.containsKey('maxEnergy')) updates['maxEnergy'] = FieldValue.delete();
        if (data.containsKey('hunger')) updates['hunger'] = FieldValue.delete();
@@ -129,6 +138,7 @@ class PetModel {
         _petData['lastTaskStatusResetDate'] = _convertToDateTime(_petData['lastTaskStatusResetDate']);
         _petData['lastPlayDate'] = _convertToDateTime(_petData['lastPlayDate']);
         _petData['lastGroomDate'] = _convertToDateTime(_petData['lastGroomDate']);
+        _petData['lastHappinessUpdateTime'] = _convertToDateTime(_petData['lastHappinessUpdateTime']);
 
         // Ensure counts are integers
         _petData['petsToday'] = _petData['petsToday'] as int? ?? 0;
@@ -140,9 +150,47 @@ class PetModel {
         // Ensure task status is the correct type
         _petData['dailyTaskStatus'] = Map<String, bool>.from(_petData['dailyTaskStatus'] ?? {});
 
-        // --- Handle Daily Resets Here ---
+        // --- Hourly Happiness Decay Logic ---
         final DateTime now = DateTime.now();
+        Map<String, dynamic> timeBasedUpdates = {};
+        DateTime? lastUpdate = _petData['lastHappinessUpdateTime'];
+
+        if (lastUpdate != null) {
+          final Duration timeDifference = now.difference(lastUpdate);
+          final int hoursPassed = timeDifference.inHours; // Get whole hours passed
+
+          if (hoursPassed > 0) {
+            print("[loadPetData] $hoursPassed hour(s) passed since last happiness update ($lastUpdate). Applying decay.");
+            final int decreasePerHour = 10;
+            final int totalDecrease = hoursPassed * decreasePerHour;
+            final int currentHappiness = _petData['happiness'];
+            final int newHappiness = math.max(0, currentHappiness - totalDecrease); // Don't go below 0
+
+            print("[loadPetData] Happiness decay: $currentHappiness -> $newHappiness (-$totalDecrease)");
+
+            // Only add updates if happiness actually changed
+            if (newHappiness != currentHappiness) {
+                timeBasedUpdates['happiness'] = newHappiness;
+                timeBasedUpdates['mood'] = _getMoodFromHappiness(newHappiness);
+            }
+            // Always update the timestamp to the *current time* after calculating decay for the passed hours
+            timeBasedUpdates['lastHappinessUpdateTime'] = FieldValue.serverTimestamp();
+             _petData['lastHappinessUpdateTime'] = now; // Update local cache immediately
+
+          } else {
+             print("[loadPetData] Less than an hour passed since last happiness update ($lastUpdate). No decay applied.");
+          }
+        } else {
+           // If timestamp is missing for some reason, set it now
+           print("[loadPetData] lastHappinessUpdateTime was null. Setting it to now.");
+           timeBasedUpdates['lastHappinessUpdateTime'] = FieldValue.serverTimestamp();
+            _petData['lastHappinessUpdateTime'] = now; // Update local cache immediately
+        }
+        // --- End Hourly Happiness Decay Logic ---
+
+        // --- Handle Daily Resets Here ---
         Map<String, dynamic> dailyResets = {};
+        bool isNewDayForTasks = !_isSameDay(_petData['lastTaskStatusResetDate'], now);
 
         // Reset interaction counts
         if (!_isSameDay(_petData['lastPetDate'], now)) dailyResets['petsToday'] = 0;
@@ -151,8 +199,8 @@ class PetModel {
         if (!_isSameDay(_petData['lastGroomDate'], now)) dailyResets['groomsToday'] = 0;
 
         // Reset task status
-        if (!_isSameDay(_petData['lastTaskStatusResetDate'], now)) {
-          print("New day detected for tasks. Resetting task status.");
+        if (isNewDayForTasks) {
+          print("[loadPetData] New day detected for tasks. Resetting task status.");
           dailyResets['dailyTaskStatus'] = <String, bool>{};
           dailyResets['lastTaskStatusResetDate'] = FieldValue.serverTimestamp();
            _petData['lastTaskStatusResetDate'] = now; // Update local date immediately
@@ -160,13 +208,25 @@ class PetModel {
 
         // Apply and persist resets if needed
         if (dailyResets.isNotEmpty) {
-          print("Applying daily resets: $dailyResets");
+          print("[loadPetData] Applying daily resets: $dailyResets");
           _petData = {..._petData, ...dailyResets}; // Apply locally first
           await updatePetData(dailyResets); // Persist resets to Firestore
         }
         // --- End Daily Resets ---
 
-        // Update mood based on loaded happiness
+        // --- Apply and Persist All Updates ---
+        // Combine updates from time decay and daily resets
+        final Map<String, dynamic> allUpdates = {...timeBasedUpdates, ...dailyResets};
+
+        if (allUpdates.isNotEmpty) {
+          print("[loadPetData] Applying updates: $allUpdates");
+          // Apply locally first, ensuring time updates overwrite older values if keys conflict
+          _petData = {..._petData, ...allUpdates};
+          await updatePetData(allUpdates); // Persist combined updates to Firestore
+        }
+        // --- End Apply Updates ---
+
+        // Ensure mood reflects the final happiness state after all updates
         _petData['mood'] = _getMoodFromHappiness(_petData['happiness']);
 
       } else {
