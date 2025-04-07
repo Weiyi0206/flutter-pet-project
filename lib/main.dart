@@ -83,7 +83,42 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Virtual Pet Companion',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent),
+        useMaterial3: true,
+        textTheme: GoogleFonts.fredokaTextTheme(
+          Theme.of(context).textTheme,
+        ).apply(
+           bodyColor: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent).onSurface,
+           displayColor: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent).onSurface,
+        ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent).primaryContainer,
+          foregroundColor: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent).onPrimaryContainer,
+          elevation: 6,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(25)),
+          ),
+          titleTextStyle: GoogleFonts.fredoka(
+             fontSize: 22,
+             fontWeight: FontWeight.bold,
+             color: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent).onPrimaryContainer,
+          )
+        ),
+        cardTheme: CardTheme(
+          elevation: 5,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          clipBehavior: Clip.antiAlias,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
+            textStyle: GoogleFonts.fredoka(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
+         floatingActionButtonTheme: FloatingActionButtonThemeData(
+           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+         )
       ),
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
@@ -1532,22 +1567,28 @@ class _MyHomePageState extends State<MyHomePage> {
                         controller: _chatController,
                         decoration: InputDecoration(
                           hintText: 'Talk to your pet...',
-                          hintStyle: TextStyle(
+                          hintStyle: GoogleFonts.fredoka( // Use Fredoka font for hint
                             color: Colors.grey.shade600,
-                            fontSize: screenSize.width * 0.04,
+                            fontSize: 16, // Adjusted fixed size
                           ),
                           filled: true,
-                          fillColor: Colors.grey.shade100,
-                          border: OutlineInputBorder(
+                          fillColor: Colors.white, // Cleaner background
+                          // Remove the generic border
+                          // border: OutlineInputBorder(...)
+                          enabledBorder: OutlineInputBorder( // Border when not focused
                             borderRadius: BorderRadius.circular(30),
-                            borderSide: BorderSide.none,
+                            borderSide: BorderSide(color: Colors.grey.shade300, width: 1.0),
                           ),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: screenSize.width * 0.05,
-                            vertical: screenSize.height * 0.015,
+                          focusedBorder: OutlineInputBorder( // Border when focused
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric( // Fixed padding
+                            horizontal: 20,
+                            vertical: 15,
                           ),
                         ),
-                        style: TextStyle(fontSize: screenSize.width * 0.04),
+                        style: GoogleFonts.fredoka(fontSize: 16), // Use Fredoka font for input
                         onSubmitted: (_) => _sendMessage(),
                       ),
                     ),
