@@ -593,7 +593,6 @@ class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin 
   
   Widget _buildMouth(double width) {
     final int happiness = widget.petData?['happiness'] as int? ?? 60;
-    print('--- buildMouth: Happiness = $happiness, Status = ${widget.status}, IsPet = $_isBeingPet ---');
 
     if (_isBeingFed) {
        // Keep feeding mouth animation

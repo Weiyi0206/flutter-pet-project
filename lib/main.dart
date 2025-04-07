@@ -25,6 +25,11 @@ import 'screens/pet_tasks_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; // Add for date formatting
 
+// --- Import new screens ---
+import 'screens/profile_screen.dart';
+import 'screens/settings_screen.dart';
+// --- End Import new screens ---
+
 // --- Added PetTask class ---
 // Define a Task class for better structure (copied from pet_tasks_screen.dart)
 class PetTask {
@@ -850,6 +855,77 @@ class _MyHomePageState extends State<MyHomePage> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
         ),
+        actions: [
+          PopupMenuButton<String>(
+            color: Theme.of(context).colorScheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.0),
+            ),
+            elevation: 4,
+            onSelected: (String result) {
+              switch (result) {
+                case 'profile':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  );
+                  break;
+                case 'settings':
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                  );
+                  break;
+                case 'signOut':
+                  FirebaseAuth.instance.signOut();
+                  break;
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(
+                value: 'profile',
+                child: ListTile(
+                  leading: Icon(Icons.person),
+                  iconColor: Theme.of(context).colorScheme.onSurface,
+                  title: Text(
+                    'Profile',
+                    style: GoogleFonts.fredoka(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'settings',
+                 child: ListTile(
+                  leading: Icon(Icons.settings),
+                  iconColor: Theme.of(context).colorScheme.onSurface,
+                  title: Text(
+                    'Settings',
+                    style: GoogleFonts.fredoka(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+              PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'signOut',
+                 child: ListTile(
+                  leading: Icon(Icons.logout),
+                  iconColor: Theme.of(context).colorScheme.onSurface,
+                  title: Text(
+                    'Sign Out',
+                    style: GoogleFonts.fredoka(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            icon: const Icon(Icons.more_vert),
+          ),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(
