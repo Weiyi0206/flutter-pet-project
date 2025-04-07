@@ -81,17 +81,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   ];
 
   Future<void> _handleCheckIn() async {
-    // Show mood selection dialog
     final selectedMood = await _showMoodSelectionDialog();
-    if (selectedMood == null) return; // User cancelled
+    if (selectedMood == null) return;
+
+    final int prevCoins = await _attendanceService.getTotalCoins();
 
     final result = await _attendanceService.markAttendanceWithMood(
       selectedMood,
     );
 
     if (result.success) {
-      // Calculate earned coins in this check-in
-      final int prevCoins = _totalCoins;
       final int newCoins = result.totalCoins;
       final int earned = newCoins - prevCoins;
 
@@ -104,14 +103,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         _earnedCoins = earned;
       });
 
-      // Reload data to get the updated mood data
       _loadAttendanceData();
 
-      // Play animation
       _animationController.reset();
       _animationController.forward();
 
-      // Hide animation after a few seconds
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
           setState(() {
@@ -126,7 +122,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
   }
 
-  // Show dialog to select mood
   Future<String?> _showMoodSelectionDialog() async {
     return showDialog<String>(
       context: context,
@@ -464,21 +459,21 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             const SizedBox(height: 16),
             _buildRewardItem(
               'Daily Check-in',
-              'Pet Treat (+10 happiness)',
+              'Pet Treat (+10 Coins)',
               Icons.pets,
               Colors.amber,
             ),
             const Divider(),
             _buildRewardItem(
               '7-Day Streak',
-              'Special Treat (+20 happiness)',
+              'Special Treat (+20 Coins)',
               Icons.card_giftcard,
               Colors.orange,
             ),
             const Divider(),
             _buildRewardItem(
               '30-Day Streak',
-              'Super Toy (+50 happiness)',
+              'Super Toy (+50 Coins)',
               Icons.star,
               Colors.purple,
             ),
@@ -595,15 +590,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '+${_lastReward!.happinessBoost} happiness',
-                style: GoogleFonts.fredoka(
-                  fontSize: 16,
-                  color: Colors.green,
-                  fontWeight: FontWeight.bold,
-                ),
               ),
             ],
           ),

@@ -47,6 +47,15 @@ class PetModel {
     'lastPetDate': null, // Store as Timestamp in Firestore
     'mealsToday': 0,
     'lastFeedDate': null, // Store as Timestamp in Firestore
+    // --- New fields for task status ---
+    'dailyTaskStatus': <String, bool>{}, // Map task ID to claimed status (true/false)
+    'lastTaskStatusResetDate': null, // Store as Timestamp in Firestore
+    // --- Add fields for Play/Groom tracking ---
+    'playsToday': 0,
+    'lastPlayDate': null,
+    'groomsToday': 0,
+    'lastGroomDate': null,
+    // --- End Play/Groom tracking fields ---
   };
 
   // Initialize pet data
@@ -60,6 +69,12 @@ class PetModel {
       _petData['lastFeedDate'] = FieldValue.serverTimestamp(); // Initialize date
       _petData['petsToday'] = 0;
       _petData['mealsToday'] = 0;
+      _petData['lastTaskStatusResetDate'] = FieldValue.serverTimestamp(); // Initialize date
+      _petData['dailyTaskStatus'] = {}; // Initialize empty map
+      _petData['lastPlayDate'] = FieldValue.serverTimestamp();
+      _petData['playsToday'] = 0;
+      _petData['lastGroomDate'] = FieldValue.serverTimestamp();
+      _petData['groomsToday'] = 0;
       await docRef.set(_petData);
     } else {
        // Ensure existing documents have the fields, if not, add them
@@ -69,6 +84,14 @@ class PetModel {
        if (data['lastPetDate'] == null) updates['lastPetDate'] = FieldValue.serverTimestamp();
        if (data['mealsToday'] == null) updates['mealsToday'] = 0;
        if (data['lastFeedDate'] == null) updates['lastFeedDate'] = FieldValue.serverTimestamp();
+       if (data['dailyTaskStatus'] == null) updates['dailyTaskStatus'] = {};
+       if (data['lastTaskStatusResetDate'] == null) {
+         updates['lastTaskStatusResetDate'] = FieldValue.serverTimestamp();
+       }
+       if (data['playsToday'] == null) updates['playsToday'] = 0;
+       if (data['lastPlayDate'] == null) updates['lastPlayDate'] = FieldValue.serverTimestamp();
+       if (data['groomsToday'] == null) updates['groomsToday'] = 0;
+       if (data['lastGroomDate'] == null) updates['lastGroomDate'] = FieldValue.serverTimestamp();
        if (updates.isNotEmpty) {
           await docRef.update(updates);
        }
@@ -93,12 +116,35 @@ class PetModel {
         _petData['lastMetricUpdateTime'] = _convertToDateTime(_petData['lastMetricUpdateTime']);
         _petData['lastPetDate'] = _convertToDateTime(_petData['lastPetDate']);
         _petData['lastFeedDate'] = _convertToDateTime(_petData['lastFeedDate']);
+        _petData['lastTaskStatusResetDate'] = _convertToDateTime(_petData['lastTaskStatusResetDate']);
+        _petData['lastPlayDate'] = _convertToDateTime(_petData['lastPlayDate']);
+        _petData['lastGroomDate'] = _convertToDateTime(_petData['lastGroomDate']);
 
         // Ensure daily counts are integers, default to 0 if null/missing
         _petData['petsToday'] = _petData['petsToday'] as int? ?? 0;
         _petData['mealsToday'] = _petData['mealsToday'] as int? ?? 0;
+        _petData['playsToday'] = _petData['playsToday'] as int? ?? 0;
+        _petData['groomsToday'] = _petData['groomsToday'] as int? ?? 0;
 
-        // Update metrics based on time passed since last update
+        // Ensure task status is the correct type
+        _petData['dailyTaskStatus'] = Map<String, bool>.from(_petData['dailyTaskStatus'] ?? {});
+
+        // --- Reset task status if it's a new day ---
+        final DateTime? lastReset = _petData['lastTaskStatusResetDate'];
+        final now = DateTime.now();
+        if (!_isSameDay(lastReset, now)) {
+            print("New day detected for tasks. Resetting task status.");
+            _petData['dailyTaskStatus'] = <String, bool>{}; // Reset locally
+            // Update Firestore immediately with reset status and new date
+            await _firestore.collection('pets').doc(_userId).update({
+                'dailyTaskStatus': {},
+                'lastTaskStatusResetDate': FieldValue.serverTimestamp()
+            });
+            _petData['lastTaskStatusResetDate'] = now; // Update local date
+        }
+        // --- End task status reset ---
+
+        // Update metrics based on time passed
         await _updateMetricsBasedOnTime();
       } else {
          // Document exists but has no data? Use defaults.
@@ -128,6 +174,8 @@ class PetModel {
     // --- Ensure lastPetDate and lastFeedDate are DateTime before use ---
     final DateTime? lastPetDate = _petData['lastPetDate'];
     final DateTime? lastFeedDate = _petData['lastFeedDate'];
+    final DateTime? lastPlayDate = _petData['lastPlayDate'];
+    final DateTime? lastGroomDate = _petData['lastGroomDate'];
     final now = DateTime.now();
 
     Map<String, dynamic> timeBasedUpdates = {};
@@ -142,6 +190,14 @@ class PetModel {
       print("New day detected for feeding. Resetting count.");
       timeBasedUpdates['mealsToday'] = 0;
       // Don't update lastFeedDate here, it's updated on interaction
+    }
+    if (!_isSameDay(lastPlayDate, now)) {
+      print("New day detected for playing. Resetting count.");
+      timeBasedUpdates['playsToday'] = 0;
+    }
+    if (!_isSameDay(lastGroomDate, now)) {
+      print("New day detected for grooming. Resetting count.");
+      timeBasedUpdates['groomsToday'] = 0;
     }
 
     // Apply daily count resets locally first if needed
@@ -335,6 +391,19 @@ class PetModel {
   // Play with the pet
   Future<void> playWithPet() async {
     try {
+      // --- Add daily tracking logic ---
+      final now = DateTime.now();
+      final lastPlayDate = _petData['lastPlayDate'];
+      int currentPlaysToday = _petData['playsToday'] ?? 0;
+      int updatedPlaysToday;
+      if (!_isSameDay(lastPlayDate, now)) {
+        updatedPlaysToday = 1;
+      } else {
+        updatedPlaysToday = currentPlaysToday + 1;
+      }
+      print("[playWithPet] playsToday count updated to $updatedPlaysToday");
+      // --- End tracking logic ---
+
       // Playing costs energy but boosts happiness and affection
       final energy = math.max(0, (_petData['energy'] ?? 0) - 20);
       final affection = math.min(100, (_petData['affection'] ?? 0) + 20);
@@ -358,6 +427,8 @@ class PetModel {
         'level': level,
         'mood': _getMoodFromHappiness(happiness),
         'lastInteractionTimes.play': FieldValue.serverTimestamp(),
+        'playsToday': updatedPlaysToday,
+        'lastPlayDate': FieldValue.serverTimestamp(),
       };
       
       // Update max energy if leveled up
@@ -367,6 +438,7 @@ class PetModel {
       
       // Update local and remote
       _petData = {..._petData, ...updates};
+      _petData['lastPlayDate'] = now; // Update local date after adding server timestamp
       await updatePetData(updates);
     } catch (e) {
       print('Error playing with pet: $e');
@@ -377,6 +449,19 @@ class PetModel {
   // Groom the pet
   Future<void> groomPet() async {
     try {
+      // --- Add daily tracking logic ---
+       final now = DateTime.now();
+      final lastGroomDate = _petData['lastGroomDate'];
+      int currentGroomsToday = _petData['groomsToday'] ?? 0;
+      int updatedGroomsToday;
+      if (!_isSameDay(lastGroomDate, now)) {
+        updatedGroomsToday = 1;
+      } else {
+        updatedGroomsToday = currentGroomsToday + 1;
+      }
+       print("[groomPet] groomsToday count updated to $updatedGroomsToday");
+      // --- End tracking logic ---
+
       // Grooming improves hygiene and slightly boosts happiness
       final hygiene = math.min(100, (_petData['hygiene'] ?? 0) + 40);
       final happiness = math.min(100, (_petData['happiness'] ?? 0) + 10);
@@ -386,10 +471,13 @@ class PetModel {
         'happiness': happiness,
         'mood': _getMoodFromHappiness(happiness),
         'lastInteractionTimes.groom': FieldValue.serverTimestamp(),
+        'groomsToday': updatedGroomsToday,
+        'lastGroomDate': FieldValue.serverTimestamp(),
       };
       
       // Update local and remote
       _petData = {..._petData, ...updates};
+      _petData['lastGroomDate'] = now; // Update local date after adding server timestamp
       await updatePetData(updates);
     } catch (e) {
       print('Error grooming pet: $e');
@@ -501,5 +589,20 @@ class PetModel {
       await addAchievement('Best Friends', 'favorite', Colors.pink, 25);
     }
     // Add more achievement checks as needed
+  }
+
+  // --- Method to update the task status map ---
+  Future<void> updateTaskStatus(Map<String, bool> newStatus) async {
+     try {
+        await _firestore.collection('pets').doc(_userId).update({
+            'dailyTaskStatus': newStatus
+        });
+        // Update local cache as well
+        _petData['dailyTaskStatus'] = newStatus;
+        print("[PetModel] Updated dailyTaskStatus: $newStatus");
+     } catch (e) {
+        print("Error updating task status: $e");
+        rethrow;
+     }
   }
 } 

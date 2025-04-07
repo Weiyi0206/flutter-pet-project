@@ -21,6 +21,7 @@ import 'services/attendance_service.dart';
 import 'screens/diary_screen.dart'; // Add this import
 import 'services/emotion_service.dart';
 import 'models/pet_model.dart';
+import 'screens/pet_tasks_screen.dart';
 
 
 void main() async {
@@ -151,7 +152,7 @@ class _MyHomePageState extends State<MyHomePage> {
     "Sometimes just sharing your thoughts can help. What's going on in your world?",
   ];
 
-  int _totalHappinessCoins = 0; // Add this line to track happiness coins
+  int _totalHappinessCoins = 0; // Keep variable for display
 
   @override
   void initState() {
@@ -261,14 +262,14 @@ class _MyHomePageState extends State<MyHomePage> {
 
   // Call _updatePetStatsFromData after loading data in interaction methods
   void _petThePet() async {
-    // --- Add log ---
     print('[_petThePet] Button pressed.');
     try {
-      await _petModel.petPet(); // Assumes this updates DB
+      await _petModel.petPet();
       print('[_petThePet] _petModel.petPet() completed.');
-      _petData = await _petModel.loadPetData(); // Reload data
+      _petData = await _petModel.loadPetData();
       print('[_petThePet] _petModel.loadPetData() completed.');
-      _updatePetStatsFromData(); // Update state and UI
+      _updatePetStatsFromData();
+      // --- No coin awarding here ---
     } catch (e) {
       print('Error petting pet: $e');
       if (mounted) { // Show error to user
@@ -280,14 +281,14 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _feedThePet() async {
-    // --- Add log ---
     print('[_feedThePet] Button pressed.');
     try {
-      await _petModel.feedPet(); // Assumes this updates DB
+      await _petModel.feedPet();
       print('[_feedThePet] _petModel.feedPet() completed.');
-      _petData = await _petModel.loadPetData(); // Reload data
+      _petData = await _petModel.loadPetData();
       print('[_feedThePet] _petModel.loadPetData() completed.');
-      _updatePetStatsFromData(); // Update state and UI
+      _updatePetStatsFromData();
+       // --- No coin awarding here ---
     } catch (e) {
       print('Error feeding pet: $e');
        if (mounted) { // Show error to user
@@ -333,7 +334,7 @@ class _MyHomePageState extends State<MyHomePage> {
      // --- Add log ---
     print('[_playWithPet] Button pressed.');
     try {
-      await _petModel.playWithPet(); // Assumes this updates DB
+      await _petModel.playWithPet();
        print('[_playWithPet] _petModel.playWithPet() completed.');
       _petData = await _petModel.loadPetData(); // Reload data
        print('[_playWithPet] _petModel.loadPetData() completed.');
@@ -352,7 +353,7 @@ class _MyHomePageState extends State<MyHomePage> {
      // --- Add log ---
     print('[_groomPet] Button pressed.');
     try {
-      await _petModel.groomPet(); // Assumes this updates DB
+      await _petModel.groomPet();
        print('[_groomPet] _petModel.groomPet() completed.');
       _petData = await _petModel.loadPetData(); // Reload data
        print('[_groomPet] _petModel.loadPetData() completed.');
@@ -792,6 +793,13 @@ class _MyHomePageState extends State<MyHomePage> {
                                             ),
                                           ),
                                       color: Colors.red,
+                                      size: isSmallScreen ? 40 : 50,
+                                    ),
+                                    _buildFeatureButton(
+                                      icon: Icons.checklist_rtl,
+                                      label: 'Tasks',
+                                      onPressed: _navigateToTasks,
+                                      color: Colors.cyan,
                                       size: isSmallScreen ? 40 : 50,
                                     ),
                                     _buildFeatureButton(
@@ -1560,10 +1568,48 @@ class _MyHomePageState extends State<MyHomePage> {
     final attendanceService = AttendanceService();
     final coins = await attendanceService.getTotalCoins();
     if (mounted) {
+      print("[MyHomePage] Reloaded coins: $coins");
       setState(() {
         _totalHappinessCoins = coins;
       });
     }
+  }
+
+  // Method to be passed as callback
+  void _refreshCoinDisplay() {
+     _loadHappinessCoins();
+  }
+
+  // Navigation method (should already exist from previous step)
+  void _navigateToTasks() {
+     // Ensure you have access to AttendanceService here if not a singleton
+     final attendanceService = AttendanceService(); // Instantiate or get service
+     // Ensure latest petData is loaded before navigating
+     _petModel.loadPetData().then((latestPetData) {
+        if (!mounted) return; // Check if still mounted after async operation
+        Navigator.push(
+           context,
+           MaterialPageRoute(
+              builder: (context) => PetTasksScreen(
+                 petModel: _petModel,
+                 petData: latestPetData, // Pass latest data
+                 attendanceService: attendanceService,
+                 onCoinsUpdated: _refreshCoinDisplay,
+              ),
+           ),
+        ).then((_) {
+           // Refresh data when returning
+           _initializePet(); // Reloads data and updates stats
+           _loadHappinessCoins(); // Refresh coin display too
+        });
+     }).catchError((error) {
+        print("Error loading pet data before navigating to tasks: $error");
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not load tasks. Please try again.'), backgroundColor: Colors.red),
+           );
+        }
+     });
   }
 }
 

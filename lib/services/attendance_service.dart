@@ -6,12 +6,12 @@ import 'package:intl/intl.dart';
 
 class AttendanceReward {
   final String name;
-  final int happinessBoost;
+  final int coinReward;
   final String? imageUrl;
 
   AttendanceReward({
     required this.name,
-    required this.happinessBoost,
+    required this.coinReward,
     this.imageUrl,
   });
 }
@@ -49,10 +49,29 @@ class AttendanceService {
 
   // Get total happiness coins earned
   Future<int> getTotalCoins() async {
-    if (_userId == null) return 0;
+    if (_userId == null || _userId!.isEmpty) return 0;
 
+    // --- If Firestore is primary source (Recommended) ---
+     try {
+        final doc = await _firestore.collection('users').doc(_userId).get();
+        if (doc.exists && doc.data() != null) {
+            return doc.data()!['totalCoins'] as int? ?? 0; // Use your actual field name
+        } else {
+            // User doc might not exist yet, check SharedPreferences as fallback or return 0
+            final prefs = await SharedPreferences.getInstance();
+            return prefs.getInt('${_userId}_$_totalCoinsKey') ?? 0;
+        }
+     } catch (e) {
+        print("Error getting total coins from Firestore: $e. Falling back to SharedPreferences.");
+        final prefs = await SharedPreferences.getInstance();
+        return prefs.getInt('${_userId}_$_totalCoinsKey') ?? 0;
+     }
+
+    // --- If SharedPreferences is primary source ---
+    /*
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt('${_userId}_$_totalCoinsKey') ?? 0;
+    */
   }
 
   // Update total happiness coins
@@ -94,7 +113,7 @@ class AttendanceService {
         final data = doc.data();
         return {
           'date': doc.id,
-          'coins': data['reward']?['happinessBoost'] ?? 0,
+          'coins': data['reward']?['coinReward'] ?? data['reward']?['happinessBoost'] ?? 0,
           'mood': data['mood'] ?? 'Unknown',
           'moodEmoji': data['moodEmoji'] ?? '😐',
         };
@@ -257,32 +276,29 @@ class AttendanceService {
       // Weekly special reward
       reward = AttendanceReward(
         name: 'Weekly Special Treat',
-        happinessBoost: 20,
+        coinReward: 20,
         imageUrl: 'assets/images/special_treat.png',
       );
     } else if (currentStreak % 30 == 0) {
       // Monthly super reward
       reward = AttendanceReward(
         name: 'Monthly Super Toy',
-        happinessBoost: 50,
+        coinReward: 50,
         imageUrl: 'assets/images/super_toy.png',
       );
     } else {
       // Regular daily reward
-      reward = AttendanceReward(name: 'Daily Pet Treat', happinessBoost: 10);
+      reward = AttendanceReward(name: 'Daily Pet Treat', coinReward: 10);
     }
 
-    // No mood bonuses - all moods get the same reward
     int moodBonus = 0;
-    // Removed mood-specific bonuses
 
-    // Update total coins with reward only (no mood bonus)
-    await _updateTotalCoins(reward.happinessBoost + moodBonus);
+    // Update total coins with reward only
+    await _updateTotalCoins(reward.coinReward + moodBonus);
 
-    // Get updated total coins
     final totalCoins = await getTotalCoins();
 
-    // Save check-in to Firestore for backup
+    // Save check-in to Firestore
     try {
       await _firestore
           .collection('users')
@@ -296,13 +312,10 @@ class AttendanceService {
             'moodEmoji': moodEmoji,
             'reward': {
               'name': reward.name,
-              'happinessBoost': reward.happinessBoost,
+              'coinReward': reward.coinReward,
             },
-            'moodBonus':
-                moodBonus, // Kept for backward compatibility, always 0 now
-            'totalCoinsEarned':
-                reward.happinessBoost +
-                moodBonus, // Equal to happinessBoost now
+            'moodBonus': moodBonus,
+            'totalCoinsEarned': reward.coinReward + moodBonus,
             'timestamp': FieldValue.serverTimestamp(),
           });
     } catch (e) {
@@ -365,6 +378,53 @@ class AttendanceService {
     }
     
     return attendanceResult;
+  }
+
+  Future<void> addCoins(int amount) async {
+    if (_userId == null || _userId!.isEmpty || amount <= 0) return; // Basic validation
+
+    // --- Option 1: Update Firestore Directly (Recommended for persistence) ---
+    final userDocRef = _firestore.collection('users').doc(_userId); // Adjust if your collection/doc path is different
+    try {
+      // Use FieldValue.increment for safe addition
+      // Make sure 'totalCoins' (or your field name) exists in the user document
+      await userDocRef.update({
+        'totalCoins': FieldValue.increment(amount), // Replace 'totalCoins' with your actual field name
+      });
+      print("[AttendanceService] Added $amount coins for user $_userId in Firestore.");
+
+      // --- Also update SharedPreferences for immediate local consistency (Optional but good) ---
+      final prefs = await SharedPreferences.getInstance();
+      final currentCoins = prefs.getInt('${_userId}_$_totalCoinsKey') ?? 0; // Use user-specific key
+      await prefs.setInt('${_userId}_$_totalCoinsKey', currentCoins + amount);
+      print("[AttendanceService] Updated SharedPreferences coins locally.");
+
+
+    } catch (e) {
+      print("Error adding coins for user $_userId in Firestore: $e");
+      // Consider creating the field if it doesn't exist or the user doc doesn't exist
+      // This might happen on the very first coin award
+       try {
+          await userDocRef.set({'totalCoins': amount}, SetOptions(merge: true));
+          print("[AttendanceService] Initialized coins field for user $_userId.");
+          // Update SharedPreferences too if initializing
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('${_userId}_$_totalCoinsKey', amount);
+
+       } catch (initError) {
+          print("Error initializing coins field for user $_userId: $initError");
+          rethrow; // Rethrow the original error or the init error
+       }
+    }
+
+    // --- Option 2: Update SharedPreferences Only (Simpler but less robust) ---
+    /*
+    final prefs = await SharedPreferences.getInstance();
+    final currentCoins = prefs.getInt('${_userId}_$_totalCoinsKey') ?? 0; // Use user-specific key
+    await prefs.setInt('${_userId}_$_totalCoinsKey', currentCoins + amount);
+    print("[AttendanceService] Added $amount coins for user $_userId in SharedPreferences.");
+    */
+    // Note: If using only SharedPreferences, getTotalCoins should also only read from SharedPreferences.
   }
 }
 
