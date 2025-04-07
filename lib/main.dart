@@ -237,6 +237,9 @@ class _MyHomePageState extends State<MyHomePage> {
   final Map<String, Timer> _cooldownTimers = {}; // Store active timers
   final Map<String, Duration> _remainingCooldowns = {}; // Store remaining durations for display
 
+  // --- Fix GlobalKey type ---
+  final GlobalKey<AnimatedPetState> _animatedPetKey = GlobalKey<AnimatedPetState>(); // Use the public 'AnimatedPetState'
+
   @override
   void initState() {
     super.initState();
@@ -465,6 +468,10 @@ class _MyHomePageState extends State<MyHomePage> {
       print('[_playWithPet] _petModel.playWithPet() completed.');
       _petData = await _petModel.loadPetData();
       print('[_playWithPet] _petModel.loadPetData() completed.');
+
+      // --- Trigger animation ---
+      _animatedPetKey.currentState?.triggerPlay();
+
       _updatePetStatsFromData();
       _updateCooldownTimer('play'); // Update timer after action
     } catch (e) {
@@ -488,6 +495,10 @@ class _MyHomePageState extends State<MyHomePage> {
       print('[_groomPet] _petModel.groomPet() completed.');
       _petData = await _petModel.loadPetData();
       print('[_groomPet] _petModel.loadPetData() completed.');
+
+      // --- Trigger animation ---
+      _animatedPetKey.currentState?.triggerGroom();
+
       _updatePetStatsFromData();
       _updateCooldownTimer('groom'); // Update timer after action
     } catch (e) {
@@ -839,6 +850,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           right: 0,
                           child: Center(
                             child: AnimatedPet(
+                              key: _animatedPetKey,
                               status: _petStatus,
                               onPet: _petThePet,
                               onFeed: _feedThePet,

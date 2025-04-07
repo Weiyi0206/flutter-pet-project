@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:math' as math;
+import 'dart:async'; // Import for Timer
 
 class AnimatedPet extends StatefulWidget {
   final String status;
@@ -19,10 +20,10 @@ class AnimatedPet extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<AnimatedPet> createState() => _AnimatedPetState();
+  State<AnimatedPet> createState() => AnimatedPetState();
 }
 
-class _AnimatedPetState extends State<AnimatedPet> with SingleTickerProviderStateMixin {
+class AnimatedPetState extends State<AnimatedPet> with TickerProviderStateMixin {
   late AnimationController _controller;
   bool _isAnimating = false;
   
@@ -137,6 +138,16 @@ class _AnimatedPetState extends State<AnimatedPet> with SingleTickerProviderStat
     });
   }
   
+  // --- Add public methods to trigger animations ---
+  void triggerPlay() {
+    _triggerPlayAnimation();
+  }
+
+  void triggerGroom() {
+    _triggerGroomAnimation();
+  }
+  // --- End added methods ---
+  
   @override
   void dispose() {
     _controller.dispose();
@@ -145,6 +156,9 @@ class _AnimatedPetState extends State<AnimatedPet> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    final double idleBobAmount = _calculateIdleBobAmount();
+    final Duration idleBobDuration = _calculateIdleBobDuration();
+
     return GestureDetector(
       onTap: () {
         widget.onPet();
@@ -161,291 +175,314 @@ class _AnimatedPetState extends State<AnimatedPet> with SingleTickerProviderStat
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: _getStatusColor().withOpacity(0.3),
-              blurRadius: widget.size * 0.075,
-              spreadRadius: widget.size * 0.025,
+              color: _getStatusColor().withOpacity(0.25),
+              blurRadius: widget.size * 0.15,
+              spreadRadius: widget.size * 0.01,
             ),
           ],
         ),
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return _buildPet();
-          },
-        ),
+        child: _buildPet(idleBobAmount, idleBobDuration),
       ),
     );
   }
 
-  Widget _buildPet() {
-    final bodySize = widget.size * 0.6;
-    final earSize = widget.size * 0.15;
-    final pawSize = widget.size * 0.125;
-    final eyeSize = widget.size * 0.08;
+  double _calculateIdleBobAmount() {
+    int happiness = widget.petData?['happiness'] as int? ?? 80;
+    if (happiness >= 90) return -7.0;
+    if (happiness >= 75) return -5.0;
+    if (happiness >= 40) return -3.5;
+    return -2.0;
+  }
+
+  Duration _calculateIdleBobDuration() {
+    int happiness = widget.petData?['happiness'] as int? ?? 80;
+    if (happiness >= 90) return 550.ms;
+    if (happiness >= 75) return 650.ms;
+    if (happiness >= 40) return 800.ms;
+    return 1100.ms;
+  }
+
+  Widget _buildPet(double idleBobAmount, Duration idleBobDuration) {
+    final double effectiveSize = widget.size;
+    final bodySize = effectiveSize * 0.55;
+    final earSize = effectiveSize * 0.18;
+    final pawSize = effectiveSize * 0.13;
+    final eyeSize = effectiveSize * 0.12;
     
+    final bool isIdle = !_isBeingPet && !_isBeingFed && !_isPlaying && !_isBeingGroomed;
+
     return Stack(
+      alignment: Alignment.center,
       children: [
-        // Body - main pet body
-        Center(
-          child: _buildBody(bodySize),
+        Align(
+          alignment: const Alignment(-0.45, -0.65),
+          child: _buildEar(isLeft: true, size: earSize, isIdle: isIdle, idleBobDuration: idleBobDuration),
+        ),
+        Align(
+          alignment: const Alignment(0.45, -0.65),
+          child: _buildEar(isLeft: false, size: earSize, isIdle: isIdle, idleBobDuration: idleBobDuration),
         ),
         
-        // Ears
-        Positioned(
-          top: widget.size * 0.15,
-          left: widget.size * 0.25,
-          child: _buildEar(isLeft: true, size: earSize),
+        Align(
+          alignment: const Alignment(-0.35, 0.7),
+          child: _buildPaw(isLeft: true, size: pawSize, isIdle: isIdle, idleBobDuration: idleBobDuration),
         ),
-        Positioned(
-          top: widget.size * 0.15,
-          right: widget.size * 0.25,
-          child: _buildEar(isLeft: false, size: earSize),
+        Align(
+          alignment: const Alignment(0.35, 0.7),
+          child: _buildPaw(isLeft: false, size: pawSize, isIdle: isIdle, idleBobDuration: idleBobDuration),
         ),
         
-        // Eyes
-        Positioned(
-          top: widget.size * 0.33,
-          left: widget.size * 0.35,
-          child: _buildEye(isLeft: true, size: eyeSize),
+        _buildBody(bodySize, isIdle: isIdle, idleBobAmount: idleBobAmount, idleBobDuration: idleBobDuration),
+        
+        Align(
+          alignment: const Alignment(-0.4, 0.25),
+          child: _buildCheek(size: effectiveSize * 0.1),
         ),
-        Positioned(
-          top: widget.size * 0.33,
-          right: widget.size * 0.35,
-          child: _buildEye(isLeft: false, size: eyeSize),
+        Align(
+          alignment: const Alignment(0.4, 0.25),
+          child: _buildCheek(size: effectiveSize * 0.1),
         ),
         
-        // Mouth - express mood
-        Positioned(
-          bottom: widget.size * 0.33,
-          left: 0,
-          right: 0,
-          child: _buildMouth(bodySize * 0.4),
+        Align(
+          alignment: const Alignment(-0.3, -0.15),
+          child: _buildEye(isLeft: true, size: eyeSize, isIdle: isIdle),
+        ),
+        Align(
+          alignment: const Alignment(0.3, -0.15),
+          child: _buildEye(isLeft: false, size: eyeSize, isIdle: isIdle),
         ),
         
-        // Paws
-        Positioned(
-          bottom: widget.size * 0.15,
-          left: widget.size * 0.2,
-          child: _buildPaw(isLeft: true, size: pawSize),
-        ),
-        Positioned(
-          bottom: widget.size * 0.15,
-          right: widget.size * 0.2,
-          child: _buildPaw(isLeft: false, size: pawSize),
+        Align(
+          alignment: const Alignment(0.0, 0.3),
+          child: _buildMouth(bodySize * 0.35),
         ),
         
-        // Animation effects
-        if (_isBeingPet) _buildPettingEffect(),
-        if (_isBeingFed) _buildFeedingEffect(),
-        if (_isPlaying) _buildPlayingEffect(),
-        if (_isBeingGroomed) _buildGroomingEffect(),
+        if (_isBeingPet) Align(alignment: const Alignment(0.6, -0.7), child: _buildPettingEffect()),
+        if (_isBeingFed) Align(alignment: const Alignment(-0.6, 0.7), child: _buildFeedingEffect()),
+        if (_isPlaying) Align(alignment: const Alignment(-0.7, -0.6), child: _buildPlayingEffect()),
+        if (_isBeingGroomed) Align(alignment: Alignment.center, child: _buildGroomingEffect()),
         
-        // Status indicators
-        if (_isHungry) _buildHungerIndicator(),
-        if (_needsAffection) _buildAffectionIndicator(),
-        if (_isUnhappy) _buildUnhappyIndicator(),
+        if (_isHungry && isIdle) Align(alignment: const Alignment(0.8, 0.8), child: _buildHungerIndicator()),
+        if (_needsAffection && isIdle) Align(alignment: const Alignment(0.8, -0.8), child: _buildAffectionIndicator()),
+        if (_isUnhappy && isIdle) Align(alignment: const Alignment(0.0, -1.15), child: _buildUnhappyIndicator()),
       ],
     );
   }
   
-  Widget _buildBody(double size) {
+  Widget _buildBody(double size, {required bool isIdle, required double idleBobAmount, required Duration idleBobDuration}) {
     final baseWidget = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: _getStatusColor(),
+        gradient: RadialGradient(
+          center: const Alignment(0.0, -0.2),
+          radius: 0.8,
+          colors: [
+            _getStatusColor().lighter(10),
+            _getStatusColor(),
+            _getStatusColor().darker(5),
+          ],
+          stops: const [0.0, 0.7, 1.0],
+        ),
         shape: BoxShape.circle,
+        border: Border.all(color: _getStatusColor().darker(10), width: 1.0),
       ),
     );
     
     if (_isBeingPet) {
-      // Subtle pulsing when being pet
       return baseWidget.animate()
         .scale(
           begin: const Offset(1.0, 1.0),
-          end: const Offset(1.07, 1.07),
-          duration: 400.ms,
-          curve: Curves.easeInOut,
+          end: const Offset(1.12, 1.12),
+          duration: 350.ms,
+          curve: Curves.easeOutBack,
         )
         .then()
         .scale(
-          begin: const Offset(1.07, 1.07),
           end: const Offset(1.0, 1.0),
           duration: 400.ms,
-          curve: Curves.easeInOut,
+          curve: Curves.easeOut,
         );
     } else if (_isBeingFed) {
-      // Wiggle when being fed
       return baseWidget.animate()
         .rotate(
-          begin: -0.05,
-          end: 0.05,
-          duration: 200.ms,
-          curve: Curves.easeInOut,
+          begin: -0.08,
+          end: 0.08,
+          duration: 150.ms,
+          curve: Curves.easeInOutSine,
         )
         .then()
         .rotate(
-          begin: 0.05,
-          end: -0.05,
-          duration: 200.ms, 
-          curve: Curves.easeInOut,
+          end: -0.08,
+          duration: 150.ms,
+          curve: Curves.easeInOutSine,
         )
         .then()
         .rotate(
-          begin: -0.05,
           end: 0.0,
-          duration: 200.ms,
-          curve: Curves.easeInOut,
+          duration: 150.ms,
+          curve: Curves.easeInOutSine,
         );
     } else if (_isPlaying) {
-      // Bounce when playing
       return baseWidget.animate()
         .moveY(
           begin: 0,
-          end: -10,
+          end: -18,
           duration: 300.ms,
+          curve: Curves.easeOut,
         )
         .then()
         .moveY(
-          begin: -10,
           end: 0,
+          duration: 450.ms,
+          curve: Curves.bounceOut,
+        )
+        .scale(
+          begin: const Offset(1.0, 1.0),
+          end: const Offset(1.05, 0.95),
           duration: 300.ms,
         )
         .then()
+        .scale(
+          end: const Offset(1.0, 1.0),
+          duration: 450.ms,
+          curve: Curves.easeOut,
+        )
+        .rotate(
+          begin: 0,
+          end: 0.05,
+          duration: 400.ms,
+        )
+        .then()
+        .rotate(
+          end: 0,
+          duration: 400.ms,
+        );
+    } else if (_isBeingGroomed) {
+      return baseWidget.animate()
+        .shake(
+          hz: 7,
+          offset: const Offset(1.5, 0),
+          duration: 600.ms,
+        )
+        .scale(
+          begin: const Offset(1.0, 1.0),
+          end: const Offset(1.05, 1.05),
+          duration: 200.ms,
+          curve: Curves.easeOut,
+        )
+        .then(
+          delay: 400.ms,
+        )
+        .scale(
+          end: const Offset(1.0, 1.0),
+          duration: 300.ms,
+        );
+    } else if (isIdle) {
+      return baseWidget.animate(onPlay: (controller) => controller.repeat(reverse: true))
+        .moveY(
+          begin: 0,
+          end: idleBobAmount,
+          duration: idleBobDuration,
+          curve: Curves.easeInOut,
+        );
+    }
+    return baseWidget;
+  }
+  
+  Widget _buildEar({required bool isLeft, required double size, required bool isIdle, required Duration idleBobDuration}) {
+    final baseWidget = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: _getStatusColor().lighter(5).withOpacity(0.85),
+        borderRadius: BorderRadius.circular(size * 0.5),
+      ),
+    );
+    
+    if (_isBeingPet) {
+      return baseWidget.animate()
+        .scale(
+          begin: const Offset(1.0, 1.0),
+          end: const Offset(1.2, 1.2),
+          duration: 300.ms,
+          curve: Curves.easeOutBack,
+        )
         .moveY(
           begin: 0,
           end: -5,
-          duration: 200.ms,
+          duration: 300.ms,
         )
-        .then()
-        .moveY(
-          begin: -5,
-          end: 0,
-          duration: 200.ms,
-        );
-    } else if (_isBeingGroomed) {
-      // Sparkle effect when groomed
-      return Stack(
-        alignment: Alignment.center,
-        children: [
-          baseWidget,
-          Container(
-            width: size * 1.1,
-            height: size * 1.1,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.transparent,
-              border: Border.all(
-                color: Colors.white.withOpacity(0.6),
-                width: 2,
-              ),
-            ),
-          ).animate().fade(
-            begin: 0,
-            end: 1,
-            duration: 300.ms,
-          ).then().fade(
-            begin: 1,
-            end: 0,
-            duration: 400.ms,
-          ),
-        ],
-      );
-    } else {
-      // Idle animation - gentle bobbing
-      return baseWidget.animate(onPlay: (controller) => controller.repeat())
-        .moveY(
-          begin: 0,
-          end: -3,
-          duration: 800.ms,
-          curve: Curves.easeInOut,
+        .then(
+          delay: 500.ms,
         )
-        .then()
         .moveY(
-          begin: -3,
           end: 0,
-          duration: 800.ms,
-          curve: Curves.easeInOut,
-        );
-    }
-  }
-  
-  Widget _buildEar({required bool isLeft, required double size}) {
-    final baseWidget = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: _getStatusColor().withOpacity(0.8),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(isLeft ? size * 0.17 : size * 0.5),
-          topRight: Radius.circular(isLeft ? size * 0.5 : size * 0.17),
-          bottomLeft: Radius.circular(size * 0.17),
-          bottomRight: Radius.circular(size * 0.17),
-        ),
-      ),
-    );
-    
-    if (_isBeingPet) {
-      // Ears perk up when pet
-      return baseWidget.animate()
-        .scale(
-          begin: const Offset(1.0, 1.0),
-          end: const Offset(1.1, 1.1),
           duration: 400.ms,
         )
-        .moveY(begin: 0, end: -2);
+        .scale(
+          end: const Offset(1.0, 1.0),
+          duration: 400.ms,
+        );
     } else if (_isPlaying) {
-      // Ears flap when playing
       return baseWidget.animate()
         .rotate(
-          begin: isLeft ? -0.1 : 0.1,
-          end: isLeft ? 0.1 : -0.1,
-          duration: 300.ms,
+          begin: isLeft ? -0.2 : 0.2,
+          end: isLeft ? 0.2 : -0.2,
+          duration: 250.ms,
+          curve: Curves.easeOut,
         )
         .then()
         .rotate(
-          begin: isLeft ? 0.1 : -0.1,
-          end: isLeft ? -0.1 : 0.1,
-          duration: 300.ms,
+          end: isLeft ? -0.2 : 0.2,
+          duration: 350.ms,
+          curve: Curves.elasticOut,
         );
-    } else {
-      // Default idle ear animation
-      return baseWidget
-        .animate(controller: _controller)
+    } else if (isIdle) {
+      return baseWidget.animate(onPlay: (c) => c.repeat(reverse: true))
         .rotate(
-          begin: isLeft ? -0.05 : 0.05,
-          end: isLeft ? 0.05 : -0.05,
+          begin: isLeft ? -0.04 : 0.04,
+          end: isLeft ? 0.04 : -0.04,
+          duration: idleBobDuration * 1.1,
           curve: Curves.easeInOut,
+        )
+        .then(
+          delay: 2.5.seconds,
+        )
+        .shake(
+          hz: 6,
+          duration: 200.ms,
+          offset: Offset(isLeft ? -0.1 : 0.1, 0.05),
         );
     }
+    return baseWidget;
   }
   
-  Widget _buildEye({required bool isLeft, required double size}) {
-    // Eye color and shape based on mood
-    Color pupilColor = Colors.black;
-    double pupilSize = size * 0.6;
-    
+  Widget _buildEye({required bool isLeft, required double size, required bool isIdle}) {
+    Color pupilColor = const Color(0xFF3A3A3A);
+    double pupilSize = size * 0.7;
+    double eyeHeightFactor = 1.0;
+    double highlightSize = pupilSize * 0.25;
+    Alignment highlightAlignment = isLeft ? const Alignment(-0.3, -0.4) : const Alignment(0.3, -0.4);
+
     if (_isUnhappy) {
-      // Sad eyes
-      pupilSize = size * 0.5;
+      pupilSize = size * 0.6;
+      eyeHeightFactor = 0.60;
+      highlightSize = pupilSize * 0.2;
     } else if (widget.status == 'Happy' || widget.status == 'Ecstatic') {
-      // Happy eyes
-      pupilSize = size * 0.65;
+      pupilSize = size * 0.75;
     }
     
-    final baseWidget = Container(
-      width: size,
-      height: _isUnhappy ? size * 0.7 : size,  // Squint eyes when unhappy
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: _getStatusColor().darker(20),
-          width: 1,
-        ),
-      ),
-      child: Center(
-        child: Container(
+    if (_isBeingPet) {
+      eyeHeightFactor = 0.1;
+    } else if (_isBeingFed) {
+      pupilSize = size * 0.85;
+    }
+    
+    Widget eyeContent = Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
           width: pupilSize,
           height: pupilSize,
           decoration: BoxDecoration(
@@ -453,240 +490,323 @@ class _AnimatedPetState extends State<AnimatedPet> with SingleTickerProviderStat
             shape: BoxShape.circle,
           ),
         ),
-      ),
+        Positioned(
+          top: size * 0.15,
+          left: isLeft ? size * 0.2 : null,
+          right: isLeft ? null : size * 0.2,
+          child: Container(
+            width: highlightSize,
+            height: highlightSize,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.9),
+              shape: BoxShape.circle,
+            ),
+          ).animate(delay: 500.ms)
+            .scale(begin: const Offset(0,0), end: const Offset(1,1), duration: 200.ms)
+            .fade(duration: 200.ms),
+        ),
+      ],
     );
-    
+
+    Widget baseWidget = Container(
+      width: size,
+      height: size,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: _getStatusColor().darker(15),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 2,
+            offset: const Offset(0, 1)
+          )
+        ]
+      ),
+      child: Transform.scale(
+        scaleY: eyeHeightFactor,
+        child: eyeContent,
+      )
+    );
+
     if (_isBeingPet) {
-      // Eyes close slightly when pet (happy squint)
-      return baseWidget.animate()
-        .custom(
-          builder: (context, value, child) {
-            return Container(
-              width: size,
-              height: size * (1 - value * 0.3),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(size * 0.5),
-                  bottom: Radius.circular(size * 0.5),
-                ),
-                border: Border.all(
-                  color: _getStatusColor().darker(20),
-                  width: 1,
-                ),
-              ),
-              child: Center(
-                child: Container(
-                  width: pupilSize,
-                  height: pupilSize * (1 - value * 0.5),
-                  decoration: BoxDecoration(
-                    color: pupilColor,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(pupilSize * 0.5),
-                      bottom: Radius.circular(pupilSize * 0.5),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-          begin: 0,
-          end: 0.7,
-          duration: 400.ms,
-        );
-    } else if (_isBeingFed) {
-      // Eyes widen when fed
-      return baseWidget.animate()
-        .scale(begin: const Offset(1.0, 1.0), end: const Offset(1.15, 1.15))
-        .then()
-        .scale(begin: const Offset(1.15, 1.15), end: const Offset(1.0, 1.0));
-    } else if (_isPlaying) {
-      // Eyes bounce when playing
       return baseWidget.animate()
         .scale(
           begin: const Offset(1.0, 1.0),
-          end: const Offset(1.1, 1.1),
+          end: const Offset(1.0, 0.15),
           duration: 300.ms,
+          curve: Curves.easeOut,
         )
-        .then()
+        .then(
+          delay: 500.ms,
+        )
         .scale(
-          begin: const Offset(1.1, 1.1),
           end: const Offset(1.0, 1.0),
           duration: 300.ms,
         );
-    } else {
-      // Default idle eye animation - slight blinking occasionally
-      return baseWidget;
+    } else if (_isBeingFed) {
+      return baseWidget.animate()
+        .scale(
+          begin: const Offset(1.0, 1.0),
+          end: const Offset(1.15, 1.15),
+          duration: 200.ms,
+          curve: Curves.easeOutBack,
+        )
+        .then(
+          delay: 400.ms,
+        )
+        .scale(
+          end: const Offset(1.0, 1.0),
+          duration: 200.ms,
+        );
+    } else if (_isPlaying) {
+      return baseWidget.animate()
+        .scale(
+          begin: const Offset(1.0, 1.0),
+          end: const Offset(1.1, 1.2),
+          duration: 250.ms,
+          curve: Curves.easeOut,
+        )
+        .then()
+        .scale(
+          end: const Offset(1.0, 1.0),
+          duration: 350.ms,
+          curve: Curves.elasticOut,
+        );
+    } else if (isIdle) {
+      return baseWidget.animate(onPlay: (c) => c.repeat())
+        .scale(
+          begin: const Offset(1.0, 1.0),
+          end: const Offset(1.0, 0.05),
+          duration: 100.ms,
+          curve: Curves.easeOut,
+        )
+        .then(
+          delay: 80.ms,
+        )
+        .scale(
+          end: const Offset(1.0, 1.0),
+          duration: 150.ms,
+          curve: Curves.easeIn,
+        )
+        .then(
+          delay: math.Random().nextInt(3500).toDouble().ms + 1500.ms,
+        );
     }
+    return baseWidget;
   }
   
   Widget _buildMouth(double width) {
-    // Mouth shape based on mood
     if (_isBeingFed) {
-      // Open mouth when feeding
-      return Container(
-        width: width,
-        height: width * 0.6,
-        decoration: BoxDecoration(
-          color: Colors.red.shade300,
-          borderRadius: BorderRadius.circular(width * 0.3),
-        ),
-        child: Center(
-          child: Container(
-            width: width * 0.6,
-            height: width * 0.3,
-            decoration: BoxDecoration(
-              color: Colors.red.shade700,
-              borderRadius: BorderRadius.circular(width * 0.15),
-            ),
-          ),
-        ),
-      );
-    } else if (_isUnhappy) {
-      // Sad mouth - upside down curve
-      return CustomPaint(
-        size: Size(width, width * 0.3),
-        painter: _MouthPainter(
-          isHappy: false,
-          mouthWidth: width,
-          color: _getStatusColor().darker(30),
-        ),
-      );
-    } else if (widget.status == 'Happy' || widget.status == 'Ecstatic' || _isBeingPet) {
-      // Happy mouth - curve
-      return CustomPaint(
-        size: Size(width, width * 0.3),
-        painter: _MouthPainter(
-          isHappy: true,
-          mouthWidth: width,
-          color: _getStatusColor().darker(30),
-        ),
-      );
-    } else {
-      // Neutral mouth - straight line
       return Container(
         width: width * 0.6,
-        height: 2,
-        color: _getStatusColor().darker(30),
+        height: width * 0.6,
+        decoration: BoxDecoration(
+          color: Colors.pink.shade200,
+          shape: BoxShape.circle,
+          border: Border.all(color: _getStatusColor().darker(30), width: 1.0),
+        ),
+      ).animate()
+        .scaleXY(begin: 0.5, end: 1.0, duration: 200.ms, curve: Curves.easeOut)
+        .then(delay: 400.ms)
+        .scaleXY(end: 0.5, duration: 200.ms);
+    } else if (_isUnhappy) {
+      return CustomPaint(
+        size: Size(width, width * 0.3),
+        painter: _MouthPainter(isHappy: false, mouthWidth: width, color: _getStatusColor().darker(40), curvature: 1.0),
+      );
+    } else if (widget.status == 'Happy' || widget.status == 'Ecstatic' || _isBeingPet) {
+      return CustomPaint(
+        size: Size(width * 1.1, width * 0.4),
+        painter: _MouthPainter(isHappy: true, mouthWidth: width * 1.1, color: _getStatusColor().darker(30), curvature: 1.0),
+      );
+    } else {
+      return Container(
+        width: width * 0.4,
+        height: 1.5,
+        decoration: BoxDecoration(
+          color: _getStatusColor().darker(40),
+          borderRadius: BorderRadius.circular(1),
+        ),
       );
     }
   }
   
-  Widget _buildPaw({required bool isLeft, required double size}) {
+  Widget _buildPaw({required bool isLeft, required double size, required bool isIdle, required Duration idleBobDuration}) {
     final baseWidget = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: _getStatusColor().withOpacity(0.8),
+        color: _getStatusColor().lighter(5).withOpacity(0.9),
         shape: BoxShape.circle,
       ),
     );
     
     if (_isPlaying) {
-      // Paws move more when playing
-      return baseWidget.animate(onPlay: (controller) => controller.repeat())
-        .moveX(
-          begin: isLeft ? -5 : 5,
-          end: isLeft ? 5 : -5,
+      return baseWidget.animate(onPlay: (controller) => controller.repeat(reverse: true))
+        .move(
+          begin: Offset(isLeft ? -8 : 8, 0),
+          end: Offset(isLeft ? 6 : -6, -5),
+          duration: 300.ms,
+          curve: Curves.easeOut,
+        )
+        .rotate(
+          begin: 0,
+          end: isLeft ? -0.15 : 0.15,
           duration: 300.ms,
         )
         .then()
-        .moveX(
-          begin: isLeft ? 5 : -5,
-          end: isLeft ? -5 : 5,
-          duration: 300.ms,
+        .move(
+          end: Offset(isLeft ? -8 : 8, 0),
+          duration: 400.ms,
+          curve: Curves.elasticOut,
+        )
+        .rotate(
+          end: 0,
+          duration: 400.ms,
         );
-    } else {
-      // Default idle paw animation
-      return baseWidget
-        .animate(controller: _controller)
+    } else if (isIdle) {
+      return baseWidget.animate(onPlay: (c) => c.repeat(reverse: true))
         .moveX(
-          begin: isLeft ? -2 : 2,
-          end: isLeft ? 2 : -2,
+          begin: isLeft ? -2.0 : 2.0,
+          end: isLeft ? 2.0 : -2.0,
+          duration: idleBobDuration,
           curve: Curves.easeInOut,
         );
     }
+    return baseWidget;
   }
   
-  // Animation effects
   Widget _buildPettingEffect() {
-    return Positioned(
-      top: widget.size * 0.15,
-      right: widget.size * 0.15,
-      child: Icon(
-        Icons.favorite,
-        color: Colors.pink.withOpacity(0.7),
-        size: widget.size * 0.2,
-      ).animate()
-        .fade(begin: 0, end: 1, duration: 200.ms)
-        .then()
-        .fade(begin: 1, end: 0, delay: 400.ms, duration: 200.ms)
-        .moveY(begin: 0, end: -15, duration: 600.ms)
-        .scale(begin: const Offset(0.5, 0.5), end: const Offset(1.2, 1.2)),
+    return Stack(
+      children: List.generate(3, (index) => Positioned(
+        child: Icon(
+          Icons.favorite,
+          color: Colors.pink.withOpacity(0.7),
+          size: widget.size * (0.25 - index * 0.05),
+        ).animate(delay: (index * 60).ms)
+          .scale(
+            begin: const Offset(0.3, 0.3),
+            end: const Offset(1.4, 1.4),
+            duration: 700.ms,
+            curve: Curves.elasticOut,
+          )
+          .moveY(
+            begin: 5,
+            end: -25,
+            duration: 700.ms,
+            curve: Curves.easeOut,
+          )
+          .then()
+          .fade(
+            begin: 1,
+            end: 0,
+            duration: 200.ms,
+          ),
+      )),
     );
   }
   
   Widget _buildFeedingEffect() {
     return Positioned(
-      bottom: widget.size * 0.25,
-      left: widget.size * 0.2,
+      bottom: widget.size * 0.3,
+      left: widget.size * 0.35,
+      right: widget.size * 0.35,
       child: Icon(
         Icons.restaurant,
         color: Colors.orange.withOpacity(0.7),
-        size: widget.size * 0.2,
+        size: widget.size * 0.22,
       ).animate()
-        .fade(begin: 0, end: 1, duration: 200.ms)
-        .then()
-        .fade(begin: 1, end: 0, delay: 400.ms, duration: 200.ms)
-        .moveY(begin: 0, end: -15, duration: 600.ms)
-        .scale(begin: const Offset(0.5, 0.5), end: const Offset(1.2, 1.2)),
+        .fadeIn(duration: 150.ms)
+        .move(
+          begin: const Offset(0, 20),
+          end: const Offset(0, 0),
+          duration: 300.ms,
+          curve: Curves.easeOut,
+        )
+        .scale(
+          begin: const Offset(0.5, 0.5),
+          end: const Offset(1.0, 1.0),
+          duration: 300.ms,
+        )
+        .then(
+          delay: 350.ms,
+        )
+        .scale(
+          end: const Offset(0.0, 0.0),
+          duration: 250.ms,
+          curve: Curves.easeIn,
+        )
+        .fadeOut(duration: 200.ms),
     );
   }
   
   Widget _buildPlayingEffect() {
-    return Positioned(
-      top: widget.size * 0.1,
-      left: widget.size * 0.2,
-      child: Icon(
-        Icons.sports_esports,
-        color: Colors.blue.withOpacity(0.7),
-        size: widget.size * 0.2,
-      ).animate()
-        .fade(begin: 0, end: 1, duration: 200.ms)
-        .then()
-        .fade(begin: 1, end: 0, delay: 400.ms, duration: 200.ms)
-        .moveY(begin: 0, end: -15, duration: 600.ms)
-        .scale(begin: const Offset(0.5, 0.5), end: const Offset(1.2, 1.2)),
+    return Stack(
+      children: List.generate(5, (index) => Positioned(
+        child: Icon(
+          Icons.sports_esports,
+          color: Colors.blue.withOpacity(0.7),
+          size: widget.size * (0.12 + math.Random().nextDouble() * 0.12),
+        ).animate(delay: (index * 100).ms)
+          .scale(
+            begin: const Offset(0.3, 0.3),
+            end: const Offset(1.3, 1.3),
+            duration: 500.ms,
+            curve: Curves.elasticOut,
+          )
+          .move(
+            begin: Offset.zero,
+            end: Offset(math.Random().nextDouble() * 20 - 10, -15),
+            duration: 700.ms,
+          )
+          .then(
+            delay: 200.ms,
+          )
+          .fade(
+            end: 0,
+            duration: 300.ms,
+          ),
+      )),
     );
   }
   
   Widget _buildGroomingEffect() {
-    return Positioned.fill(
-      child: OverflowBox(
-        maxWidth: widget.size * 1.2,
-        maxHeight: widget.size * 1.2,
-        child: Container(
-          width: widget.size * 1.2,
-          height: widget.size * 1.2,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [
-                Colors.white.withOpacity(0.7),
-                Colors.white.withOpacity(0),
-              ],
-              stops: const [0.7, 1.0],
+    return Stack(
+      children: List.generate(7, (index) => Positioned.fill(
+        child: Align(
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.star,
+            color: Colors.yellow.withOpacity(0.7),
+            size: widget.size * (0.12 + math.Random().nextDouble() * 0.15),
+          ).animate(delay: (index * 80).ms)
+            .scale(
+              begin: const Offset(0.0, 0.0),
+              end: const Offset(1.0, 1.0),
+              duration: 350.ms,
+              curve: Curves.elasticOut,
+            )
+            .then(
+              delay: 250.ms,
+            )
+            .scale(
+              end: const Offset(0.0, 0.0),
+              duration: 350.ms,
+            )
+            .fade(
+              end: 0,
+              duration: 350.ms,
             ),
-          ),
-        ).animate()
-          .fade(begin: 0, end: 1, duration: 300.ms)
-          .then()
-          .fade(begin: 1, end: 0, duration: 700.ms),
-      ),
+        ),
+      )),
     );
   }
   
-  // Need indicators
   Widget _buildHungerIndicator() {
     return Positioned(
       bottom: widget.size * 0.1,
@@ -787,26 +907,29 @@ class _AnimatedPetState extends State<AnimatedPet> with SingleTickerProviderStat
     );
   }
 
+  Widget _buildCheek({required double size}) {
+    return Container(
+      width: size,
+      height: size * 0.6,
+      decoration: BoxDecoration(
+        color: Colors.pink.shade100.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(size * 0.3),
+      ),
+    ).animate(onPlay: (c)=> c.repeat(reverse: true), delay: 1.seconds)
+      .fade(begin: 0.4, end: 0.6, duration: 1500.ms);
+  }
+
   Color _getStatusColor() {
-    switch (widget.status) {
-      case 'Ecstatic':
-        return Colors.green.shade300;
-      case 'Happy':
-        return Colors.lightGreen.shade300;
-      case 'Content':
-        return Colors.blue.shade300;
-      case 'Neutral':
-        return Colors.lightBlue.shade300;
-      case 'Sad':
-        return Colors.indigo.shade300;
-      case 'Depressed':
-        return Colors.purple.shade300;
-      default:
-        return Colors.blue.shade300;
-    }
+    int happiness = widget.petData?['happiness'] as int? ?? 80;
+
+    if (happiness >= 90) return const Color(0xFFFFF59D);
+    if (happiness >= 75) return const Color(0xFFA5D6A7);
+    if (happiness >= 60) return const Color(0xFF90CAF9);
+    if (happiness >= 40) return const Color(0xFFB3E5FC);
+    if (happiness >= 25) return const Color(0xFFCE93D8);
+    return const Color(0xFFBDBDBD);
   }
   
-  // Need detection from pet data
   bool get _isHungry => widget.petData != null && 
       widget.petData!['hunger'] != null && 
       (widget.petData!['hunger'] <= 30);
@@ -820,7 +943,6 @@ class _AnimatedPetState extends State<AnimatedPet> with SingleTickerProviderStat
       (widget.petData!['happiness'] <= 40);
 }
 
-// Extension to make colors darker
 extension ColorExtension on Color {
   Color darker(int percent) {
     assert(1 <= percent && percent <= 100);
@@ -832,18 +954,29 @@ extension ColorExtension on Color {
       (blue * value).round(),
     );
   }
+
+  Color lighter(int percent) {
+    assert(1 <= percent && percent <= 100);
+    final double value = percent / 100;
+    int red = (this.red + (255 - this.red) * value).round().clamp(0, 255);
+    int green = (this.green + (255 - this.green) * value).round().clamp(0, 255);
+    int blue = (this.blue + (255 - this.blue) * value).round().clamp(0, 255);
+    return Color.fromARGB(alpha, red, green, blue);
+  }
 }
 
-// Custom painter for mouth shape
 class _MouthPainter extends CustomPainter {
   final bool isHappy;
   final double mouthWidth;
   final Color color;
+  final double curvature;
+  final double strokeWidth = 1.5;
   
   _MouthPainter({
     required this.isHappy,
     required this.mouthWidth, 
     required this.color,
+    required this.curvature,
   });
   
   @override
@@ -851,17 +984,20 @@ class _MouthPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
+      ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
       
     final path = Path();
-    path.moveTo(0, isHappy ? size.height : 0);
-    
+    final startY = isHappy ? size.height * 0.1 : size.height * 0.9;
+    final endY = isHappy ? size.height * 0.1 : size.height * 0.9;
+    final controlY = isHappy ? -size.height * 0.4 * curvature : size.height * 1.4 * curvature;
+
+    path.moveTo(0, startY);
     path.quadraticBezierTo(
       size.width / 2,
       isHappy ? 0 : size.height,
       size.width,
-      isHappy ? size.height : 0,
+      endY,
     );
     
     canvas.drawPath(path, paint);
@@ -871,5 +1007,6 @@ class _MouthPainter extends CustomPainter {
   bool shouldRepaint(_MouthPainter oldDelegate) => 
     oldDelegate.isHappy != isHappy || 
     oldDelegate.mouthWidth != mouthWidth ||
-    oldDelegate.color != color;
+    oldDelegate.color != color ||
+    oldDelegate.curvature != curvature;
 } 
