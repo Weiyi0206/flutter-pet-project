@@ -24,6 +24,10 @@ import 'models/pet_model.dart';
 import 'screens/pet_tasks_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; // Add for date formatting
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
+import 'services/language_service.dart';
 
 // --- Import new screens ---
 import 'screens/profile_screen.dart';
@@ -39,7 +43,8 @@ class PetTask {
   final IconData icon;
   final Color color;
   final int requiredCount;
-  final String currentCountKey; // Key in petData for current progress (e.g., 'petsToday')
+  final String
+  currentCountKey; // Key in petData for current progress (e.g., 'petsToday')
   final int coinReward;
   // Add other potential rewards like XP if needed
   // final int xpReward;
@@ -60,6 +65,11 @@ class PetTask {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Increment app usage count
+  final prefs = await SharedPreferences.getInstance();
+  int usageCount = prefs.getInt('appUsageCount') ?? 0;
+  await prefs.setInt('appUsageCount', usageCount + 1);
+
   // Initialize logging
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
@@ -81,44 +91,64 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Virtual Pet Companion',
+      title: 'PetPause',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent),
         useMaterial3: true,
         textTheme: GoogleFonts.fredokaTextTheme(
           Theme.of(context).textTheme,
         ).apply(
-           bodyColor: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent).onSurface,
-           displayColor: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent).onSurface,
+          bodyColor:
+              ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent).onSurface,
+          displayColor:
+              ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent).onSurface,
         ),
         appBarTheme: AppBarTheme(
-          backgroundColor: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent).primaryContainer,
-          foregroundColor: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent).onPrimaryContainer,
+          backgroundColor:
+              ColorScheme.fromSeed(
+                seedColor: Colors.lightBlueAccent,
+              ).primaryContainer,
+          foregroundColor:
+              ColorScheme.fromSeed(
+                seedColor: Colors.lightBlueAccent,
+              ).onPrimaryContainer,
           elevation: 6,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(bottom: Radius.circular(25)),
           ),
           titleTextStyle: GoogleFonts.fredoka(
-             fontSize: 22,
-             fontWeight: FontWeight.bold,
-             color: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent).onPrimaryContainer,
-          )
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color:
+                ColorScheme.fromSeed(
+                  seedColor: Colors.lightBlueAccent,
+                ).onPrimaryContainer,
+          ),
         ),
         cardTheme: CardTheme(
           elevation: 5,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           clipBehavior: Clip.antiAlias,
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
-            textStyle: GoogleFonts.fredoka(fontSize: 16, fontWeight: FontWeight.bold),
+            textStyle: GoogleFonts.fredoka(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-         floatingActionButtonTheme: FloatingActionButtonThemeData(
-           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-         )
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
       ),
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
@@ -132,7 +162,7 @@ class MyApp extends StatelessWidget {
           }
 
           if (snapshot.hasData) {
-            return const MyHomePage(title: 'Virtual Pet Companion');
+            return const MyHomePage(title: 'PetPause');
           }
 
           return const AuthWrapper();
@@ -283,11 +313,46 @@ class _MyHomePageState extends State<MyHomePage> {
   int _consecutiveNegativeMoods = 0;
 
   // Emotion detection keywords
-  final List<String> lonelyWords = ['lonely', 'alone', 'no one', 'by myself', 'no friends', 'isolated'];
-  final List<String> sadWords = ['sad', 'unhappy', 'depressed', 'down', 'blue', 'miserable'];
-  final List<String> anxiousWords = ['anxious', 'nervous', 'worry', 'worried', 'stress', 'stressed'];
-  final List<String> angryWords = ['angry', 'mad', 'furious', 'rage', 'hate', 'annoyed'];
-  final List<String> happyWords = ['happy', 'joy', 'excited', 'great', 'good', 'wonderful'];
+  final List<String> lonelyWords = [
+    'lonely',
+    'alone',
+    'no one',
+    'by myself',
+    'no friends',
+    'isolated',
+  ];
+  final List<String> sadWords = [
+    'sad',
+    'unhappy',
+    'depressed',
+    'down',
+    'blue',
+    'miserable',
+  ];
+  final List<String> anxiousWords = [
+    'anxious',
+    'nervous',
+    'worry',
+    'worried',
+    'stress',
+    'stressed',
+  ];
+  final List<String> angryWords = [
+    'angry',
+    'mad',
+    'furious',
+    'rage',
+    'hate',
+    'annoyed',
+  ];
+  final List<String> happyWords = [
+    'happy',
+    'joy',
+    'excited',
+    'great',
+    'good',
+    'wonderful',
+  ];
 
   Timer? _tipTimer;
   final Random _random = Random();
@@ -306,21 +371,26 @@ class _MyHomePageState extends State<MyHomePage> {
   int _totalHappinessCoins = 0; // Keep variable for display
 
   // --- Define Cooldown Duration ---
-  static const Duration _interactionCooldown = Duration(minutes: 1); // Example: 1 minute cooldown
+  static const Duration _interactionCooldown = Duration(
+    minutes: 1,
+  ); // Example: 1 minute cooldown
 
   // --- Cooldown State ---
   final Map<String, Timer> _cooldownTimers = {}; // Store active timers
-  final Map<String, Duration> _remainingCooldowns = {}; // Store remaining durations for display
+  final Map<String, Duration> _remainingCooldowns =
+      {}; // Store remaining durations for display
 
   // --- Fix GlobalKey type ---
-  final GlobalKey<AnimatedPetState> _animatedPetKey = GlobalKey<AnimatedPetState>(); // Use the public 'AnimatedPetState'
+  final GlobalKey<AnimatedPetState> _animatedPetKey =
+      GlobalKey<AnimatedPetState>(); // Use the public 'AnimatedPetState'
 
   String _userId = FirebaseAuth.instance.currentUser?.uid ?? ''; // Store userId
 
   @override
   void initState() {
     super.initState();
-    _userId = FirebaseAuth.instance.currentUser?.uid ?? ''; // Ensure userId is set
+    _userId =
+        FirebaseAuth.instance.currentUser?.uid ?? ''; // Ensure userId is set
 
     void showInitialCheckIn() async {
       final attendanceService = AttendanceService();
@@ -354,7 +424,8 @@ class _MyHomePageState extends State<MyHomePage> {
     Timer.periodic(const Duration(minutes: 60), (timer) {
       if (mounted && _currentResponse == null) {
         final rand = _random.nextDouble();
-        if (rand < 0.4) {  // 40% chance each hour
+        if (rand < 0.4) {
+          // 40% chance each hour
           _showCompanionshipPrompt();
         }
       }
@@ -362,7 +433,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // Start timers for any existing cooldowns after initial load
     WidgetsBinding.instance.addPostFrameCallback((_) {
-       _updateAllCooldownTimers();
+      _updateAllCooldownTimers();
     });
   }
 
@@ -408,13 +479,17 @@ class _MyHomePageState extends State<MyHomePage> {
       _mealsTodayCount = _petData['mealsToday'] as int? ?? 0;
 
       // --- Add logs ---
-      print('[_updatePetStatsFromData] Updated state: _petsTodayCount=$_petsTodayCount, _mealsTodayCount=$_mealsTodayCount');
+      print(
+        '[_updatePetStatsFromData] Updated state: _petsTodayCount=$_petsTodayCount, _mealsTodayCount=$_mealsTodayCount',
+      );
 
       // Update mood status based on petData first, then fallback to happiness
       if (_petData.isNotEmpty && _petData.containsKey('mood')) {
         _petStatus = _petData['mood'] as String? ?? 'Normal';
         // --- Add log ---
-        print('[_updatePetStatsFromData] Updated state: _petStatus=$_petStatus (from _petData)');
+        print(
+          '[_updatePetStatsFromData] Updated state: _petStatus=$_petStatus (from _petData)',
+        );
       } else {
         // Fallback logic based on happiness (can be adjusted)
         if (_happiness >= 80) {
@@ -425,7 +500,9 @@ class _MyHomePageState extends State<MyHomePage> {
           _petStatus = 'Sad';
         }
         // --- Add log ---
-        print('[_updatePetStatsFromData] Updated state: _petStatus=$_petStatus (from fallback)');
+        print(
+          '[_updatePetStatsFromData] Updated state: _petStatus=$_petStatus (from fallback)',
+        );
       }
       // Note: _happiness itself might need to be loaded from _petData too
       // _happiness = _petData['happiness'] as int? ?? 50;
@@ -451,16 +528,21 @@ class _MyHomePageState extends State<MyHomePage> {
     }
     // No need for setState here as it's called within _updatePetStatsFromData's setState
     _completedTasksCount = count;
-    print('[_calculateCompletedTasks] Calculated completed tasks: $_completedTasksCount / ${_tasks.length}');
+    print(
+      '[_calculateCompletedTasks] Calculated completed tasks: $_completedTasksCount / ${_tasks.length}',
+    );
   }
 
   // --- Helper to check cooldown ---
   bool _isOnCooldown(String interactionType) {
     final lastInteraction = _petData['lastInteractionTimes']?[interactionType];
-    if (lastInteraction is DateTime) { // Check if it's a DateTime object
+    if (lastInteraction is DateTime) {
+      // Check if it's a DateTime object
       final now = DateTime.now();
       final difference = now.difference(lastInteraction);
-      print("Cooldown check for '$interactionType': Last interaction was $difference ago.");
+      print(
+        "Cooldown check for '$interactionType': Last interaction was $difference ago.",
+      );
       return difference < _interactionCooldown;
     }
     return false; // Not on cooldown if no last interaction time found
@@ -468,22 +550,25 @@ class _MyHomePageState extends State<MyHomePage> {
 
   // --- Helper to show cooldown message ---
   void _showCooldownMessage(String actionName) {
-     if (!mounted) return;
-     final lastInteraction = _petData['lastInteractionTimes']?[actionName.toLowerCase()];
-     String message = '$actionName is on cooldown.';
-     if (lastInteraction is DateTime) {
-        final timeRemaining = _interactionCooldown - DateTime.now().difference(lastInteraction);
-        if (timeRemaining.inSeconds > 0) {
-           message = '$actionName is resting. Try again in ${timeRemaining.inSeconds} seconds.';
-        }
-     }
-     ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-           content: Text(message),
-           duration: const Duration(seconds: 2),
-           backgroundColor: Colors.orange.shade700,
-        ),
-     );
+    if (!mounted) return;
+    final lastInteraction =
+        _petData['lastInteractionTimes']?[actionName.toLowerCase()];
+    String message = '$actionName is on cooldown.';
+    if (lastInteraction is DateTime) {
+      final timeRemaining =
+          _interactionCooldown - DateTime.now().difference(lastInteraction);
+      if (timeRemaining.inSeconds > 0) {
+        message =
+            '$actionName is resting. Try again in ${timeRemaining.inSeconds} seconds.';
+      }
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+        backgroundColor: Colors.orange.shade700,
+      ),
+    );
   }
 
   // --- Update Interaction Methods ---
@@ -508,10 +593,14 @@ class _MyHomePageState extends State<MyHomePage> {
       _updateCooldownTimer('pet');
     } catch (e) {
       print('Error petting pet: $e');
-      if (mounted) { // Show error to user
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error petting pet: $e'), backgroundColor: Colors.red),
-          );
+      if (mounted) {
+        // Show error to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error petting pet: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -536,10 +625,14 @@ class _MyHomePageState extends State<MyHomePage> {
       _updateCooldownTimer('feed');
     } catch (e) {
       print('Error feeding pet: $e');
-       if (mounted) { // Show error to user
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error feeding pet: $e'), backgroundColor: Colors.red),
-          );
+      if (mounted) {
+        // Show error to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error feeding pet: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -562,10 +655,14 @@ class _MyHomePageState extends State<MyHomePage> {
       _updateCooldownTimer('play');
     } catch (e) {
       print('Error playing with pet: $e');
-       if (mounted) { // Show error to user
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error playing with pet: $e'), backgroundColor: Colors.red),
-          );
+      if (mounted) {
+        // Show error to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error playing with pet: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -588,10 +685,14 @@ class _MyHomePageState extends State<MyHomePage> {
       _updateCooldownTimer('groom');
     } catch (e) {
       print('Error grooming pet: $e');
-       if (mounted) { // Show error to user
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error grooming pet: $e'), backgroundColor: Colors.red),
-          );
+      if (mounted) {
+        // Show error to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error grooming pet: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -606,9 +707,9 @@ class _MyHomePageState extends State<MyHomePage> {
   void _sendMessage() async {
     if (_chatController.text.trim().isEmpty) return;
     if (_userId.isEmpty) {
-        print("Cannot send message: User ID is empty.");
-        // Optionally show a message to the user
-        return;
+      print("Cannot send message: User ID is empty.");
+      // Optionally show a message to the user
+      return;
     }
 
     final userMessageText = _chatController.text;
@@ -625,15 +726,18 @@ class _MyHomePageState extends State<MyHomePage> {
     final messageDataForSave = {
       'text': userMessageText,
       'isUser': true,
-      'timestamp': Timestamp.fromDate(now), // Convert DateTime to Firestore Timestamp
+      'timestamp': Timestamp.fromDate(
+        now,
+      ), // Convert DateTime to Firestore Timestamp
     };
 
     // Enhanced mood detection from the message
     final moodResult = _detectMoodFromText(userMessageText);
-    final hasEmotionalContent = moodResult['lonely'] == true || 
-                               moodResult['anxious'] == true || 
-                               moodResult['sad'] == true || 
-                               moodResult['angry'] == true;
+    final hasEmotionalContent =
+        moodResult['lonely'] == true ||
+        moodResult['anxious'] == true ||
+        moodResult['sad'] == true ||
+        moodResult['angry'] == true;
     final detectedMood = moodResult['mood'];
 
     // Check for signs of distress in the message
@@ -649,33 +753,40 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // Save user message to Firestore asynchronously
     try {
-       await _petModel.saveChatMessage(messageDataForSave); // Pass map with Timestamp.fromDate()
-       print("User message saved to Firestore.");
+      await _petModel.saveChatMessage(
+        messageDataForSave,
+      ); // Pass map with Timestamp.fromDate()
+      print("User message saved to Firestore.");
 
-       // --- ADDED: Increment chat count task ---
-       await _petModel.incrementChatCount();
-       // --- END ADDED ---
-
+      // --- ADDED: Increment chat count task ---
+      await _petModel.incrementChatCount();
+      // --- END ADDED ---
     } catch (e) {
-       print("Error saving user message: $e");
-       // Optionally revert UI update or show error
-       if(mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(content: Text('Error saving your message.'), backgroundColor: Colors.red),
-           );
-           // Consider removing the message from the local list if saving failed
-           // setState(() { _messages.remove(localMessage); });
-       }
+      print("Error saving user message: $e");
+      // Optionally revert UI update or show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving your message.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        // Consider removing the message from the local list if saving failed
+        // setState(() { _messages.remove(localMessage); });
+      }
     }
     // --- End Update UI & Save to DB ---
 
     // --- Get AI Response ---
     try {
       String responseText;
-      
+
       // Use the enhanced mental health response if emotional content is detected
       if (hasEmotionalContent) {
-        responseText = await _geminiService.getMentalHealthResponse(userMessageText, moodResult);
+        responseText = await _geminiService.getMentalHealthResponse(
+          userMessageText,
+          moodResult,
+        );
       } else {
         // Otherwise use the standard chat response
         responseText = await _geminiService.getChatResponse(
@@ -689,14 +800,19 @@ class _MyHomePageState extends State<MyHomePage> {
       // Create response message object
       final responseTimestamp = DateTime.now(); // Get time for response
       final localResponse = ChatMessage(
-          text: responseText, isUser: false, timestamp: responseTimestamp);
+        text: responseText,
+        isUser: false,
+        timestamp: responseTimestamp,
+      );
 
       // Prepare response data for saving - Use Timestamp.fromDate()
-       final responseDataForSave = {
-         'text': responseText,
-         'isUser': false,
-         'timestamp': Timestamp.fromDate(responseTimestamp), // Convert DateTime to Firestore Timestamp
-       };
+      final responseDataForSave = {
+        'text': responseText,
+        'isUser': false,
+        'timestamp': Timestamp.fromDate(
+          responseTimestamp,
+        ), // Convert DateTime to Firestore Timestamp
+      };
 
       if (mounted) {
         // Update UI with response
@@ -706,7 +822,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
           // Adjust happiness based on detected mood - reward the user for sharing
           if (hasEmotionalContent) {
-            _happiness = min(_happiness + 5, 100); // Happiness boost for emotional sharing
+            _happiness = min(
+              _happiness + 5,
+              100,
+            ); // Happiness boost for emotional sharing
           }
           // Additional happiness adjustments based on detected mood
           if (detectedMood != null) {
@@ -721,17 +840,22 @@ class _MyHomePageState extends State<MyHomePage> {
 
         // Save AI response to Firestore asynchronously
         try {
-           await _petModel.saveChatMessage(responseDataForSave); // Pass map with Timestamp.fromDate()
-           print("AI response saved to Firestore.");
+          await _petModel.saveChatMessage(
+            responseDataForSave,
+          ); // Pass map with Timestamp.fromDate()
+          print("AI response saved to Firestore.");
         } catch (e) {
-           print("Error saving AI response: $e");
-            if(mounted) {
-               ScaffoldMessenger.of(context).showSnackBar(
-                 SnackBar(content: Text('Error saving AI response.'), backgroundColor: Colors.red),
-               );
-               // Consider removing the response from the local list
-               // setState(() { _messages.remove(localResponse); });
-            }
+          print("Error saving AI response: $e");
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error saving AI response.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            // Consider removing the response from the local list
+            // setState(() { _messages.remove(localResponse); });
+          }
         }
 
         _updatePetStatsFromData(); // Update pet status
@@ -739,7 +863,9 @@ class _MyHomePageState extends State<MyHomePage> {
         // Remove speech bubble after delay
         Future.delayed(const Duration(seconds: 15), () {
           if (mounted && _currentResponse == responseText) {
-            setState(() { _currentResponse = null; });
+            setState(() {
+              _currentResponse = null;
+            });
           }
         });
       }
@@ -747,7 +873,10 @@ class _MyHomePageState extends State<MyHomePage> {
       // Handle AI error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error getting response: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error getting response: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
         // Maybe add an error message to the chat?
         // final errorTimestamp = DateTime.now();
@@ -904,10 +1033,14 @@ class _MyHomePageState extends State<MyHomePage> {
     final isSmallScreen = screenSize.width < 360;
 
     // --- Get current cooldown status and remaining times ---
-    final Duration petCooldownRemaining = _remainingCooldowns['pet'] ?? _getRemainingCooldown('pet');
-    final Duration feedCooldownRemaining = _remainingCooldowns['feed'] ?? _getRemainingCooldown('feed');
-    final Duration playCooldownRemaining = _remainingCooldowns['play'] ?? _getRemainingCooldown('play');
-    final Duration groomCooldownRemaining = _remainingCooldowns['groom'] ?? _getRemainingCooldown('groom');
+    final Duration petCooldownRemaining =
+        _remainingCooldowns['pet'] ?? _getRemainingCooldown('pet');
+    final Duration feedCooldownRemaining =
+        _remainingCooldowns['feed'] ?? _getRemainingCooldown('feed');
+    final Duration playCooldownRemaining =
+        _remainingCooldowns['play'] ?? _getRemainingCooldown('play');
+    final Duration groomCooldownRemaining =
+        _remainingCooldowns['groom'] ?? _getRemainingCooldown('groom');
 
     final bool isPettingOnCooldown = petCooldownRemaining > Duration.zero;
     final bool isFeedingOnCooldown = feedCooldownRemaining > Duration.zero;
@@ -917,12 +1050,18 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(
-          widget.title,
-          style: GoogleFonts.fredoka(
-            fontSize: screenSize.width * 0.055, // Responsive font size
-            fontWeight: FontWeight.bold,
-          ),
+        title: Row(
+          children: [
+            Image.asset('assets/logoremovebg.png', height: 50, width: 60),
+            const SizedBox(width: 4),
+            Text(
+              widget.title,
+              style: GoogleFonts.lobster(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
         elevation: 8,
         shape: const RoundedRectangleBorder(
@@ -940,13 +1079,17 @@ class _MyHomePageState extends State<MyHomePage> {
                 case 'profile':
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const ProfileScreen(),
+                    ),
                   );
                   break;
                 case 'settings':
-                   Navigator.push(
+                  Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsScreen(),
+                    ),
                   );
                   break;
                 case 'signOut':
@@ -954,48 +1097,49 @@ class _MyHomePageState extends State<MyHomePage> {
                   break;
               }
             },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(
-                value: 'profile',
-                child: ListTile(
-                  leading: Icon(Icons.person),
-                  iconColor: Theme.of(context).colorScheme.onSurface,
-                  title: Text(
-                    'Profile',
-                    style: GoogleFonts.fredoka(
-                      color: Theme.of(context).colorScheme.onSurface,
+            itemBuilder:
+                (BuildContext context) => <PopupMenuEntry<String>>[
+                  PopupMenuItem<String>(
+                    value: 'profile',
+                    child: ListTile(
+                      leading: Icon(Icons.person),
+                      iconColor: Theme.of(context).colorScheme.onSurface,
+                      title: Text(
+                        'Profile',
+                        style: GoogleFonts.fredoka(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              PopupMenuItem<String>(
-                value: 'settings',
-                 child: ListTile(
-                  leading: Icon(Icons.settings),
-                  iconColor: Theme.of(context).colorScheme.onSurface,
-                  title: Text(
-                    'Settings',
-                    style: GoogleFonts.fredoka(
-                      color: Theme.of(context).colorScheme.onSurface,
+                  PopupMenuItem<String>(
+                    value: 'settings',
+                    child: ListTile(
+                      leading: Icon(Icons.settings),
+                      iconColor: Theme.of(context).colorScheme.onSurface,
+                      title: Text(
+                        'Settings',
+                        style: GoogleFonts.fredoka(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              PopupMenuDivider(),
-              PopupMenuItem<String>(
-                value: 'signOut',
-                 child: ListTile(
-                  leading: Icon(Icons.logout),
-                  iconColor: Theme.of(context).colorScheme.onSurface,
-                  title: Text(
-                    'Sign Out',
-                    style: GoogleFonts.fredoka(
-                      color: Theme.of(context).colorScheme.onSurface,
+                  PopupMenuDivider(),
+                  PopupMenuItem<String>(
+                    value: 'signOut',
+                    child: ListTile(
+                      leading: Icon(Icons.logout),
+                      iconColor: Theme.of(context).colorScheme.onSurface,
+                      title: Text(
+                        'Sign Out',
+                        style: GoogleFonts.fredoka(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ],
+                ],
             icon: const Icon(Icons.more_vert),
           ),
         ],
@@ -1106,7 +1250,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                       onPressed: () {
                                         Navigator.push(
                                           context,
-                                          MaterialPageRoute(builder: (context) => AttendanceScreen()),
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) => AttendanceScreen(),
+                                          ),
                                         );
                                       },
                                       color: Colors.blue,
@@ -1156,7 +1303,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (context) => const DiaryScreen(),
+                                            builder:
+                                                (context) =>
+                                                    const DiaryScreen(),
                                           ),
                                         );
                                       },
@@ -1173,11 +1322,15 @@ class _MyHomePageState extends State<MyHomePage> {
                                     _buildFeatureButton(
                                       icon: Icons.pets,
                                       label: 'Pet',
-                                      onPressed: isPettingOnCooldown ? null : _petThePet,
+                                      onPressed:
+                                          isPettingOnCooldown
+                                              ? null
+                                              : _petThePet,
                                       color: Colors.purple,
                                       size: isSmallScreen ? 40 : 50,
                                       disabled: isPettingOnCooldown,
-                                      cooldownRemaining: petCooldownRemaining, // Pass remaining time
+                                      cooldownRemaining:
+                                          petCooldownRemaining, // Pass remaining time
                                     ),
                                     SizedBox(
                                       width: constraints.maxWidth * 0.05,
@@ -1185,11 +1338,16 @@ class _MyHomePageState extends State<MyHomePage> {
                                     _buildFeatureButton(
                                       icon: Icons.sports_esports,
                                       label: 'Play',
-                                      onPressed: (isPlayingOnCooldown || _petData.isEmpty) ? null : _playWithPet,
+                                      onPressed:
+                                          (isPlayingOnCooldown ||
+                                                  _petData.isEmpty)
+                                              ? null
+                                              : _playWithPet,
                                       color: Colors.blue,
                                       size: isSmallScreen ? 40 : 50,
                                       disabled: isPlayingOnCooldown,
-                                      cooldownRemaining: playCooldownRemaining, // Pass remaining time
+                                      cooldownRemaining:
+                                          playCooldownRemaining, // Pass remaining time
                                     ),
                                     SizedBox(
                                       width: constraints.maxWidth * 0.05,
@@ -1197,11 +1355,15 @@ class _MyHomePageState extends State<MyHomePage> {
                                     _buildFeatureButton(
                                       icon: Icons.restaurant,
                                       label: 'Feed',
-                                      onPressed: isFeedingOnCooldown ? null : _feedThePet,
+                                      onPressed:
+                                          isFeedingOnCooldown
+                                              ? null
+                                              : _feedThePet,
                                       color: Colors.orange,
                                       size: isSmallScreen ? 40 : 50,
                                       disabled: isFeedingOnCooldown,
-                                      cooldownRemaining: feedCooldownRemaining, // Pass remaining time
+                                      cooldownRemaining:
+                                          feedCooldownRemaining, // Pass remaining time
                                     ),
                                     SizedBox(
                                       width: constraints.maxWidth * 0.05,
@@ -1209,11 +1371,16 @@ class _MyHomePageState extends State<MyHomePage> {
                                     _buildFeatureButton(
                                       icon: Icons.cleaning_services,
                                       label: 'Groom',
-                                      onPressed: (isGroomingOnCooldown || _petData.isEmpty) ? null : _groomPet,
+                                      onPressed:
+                                          (isGroomingOnCooldown ||
+                                                  _petData.isEmpty)
+                                              ? null
+                                              : _groomPet,
                                       color: Colors.green,
                                       size: isSmallScreen ? 40 : 50,
                                       disabled: isGroomingOnCooldown,
-                                      cooldownRemaining: groomCooldownRemaining, // Pass remaining time
+                                      cooldownRemaining:
+                                          groomCooldownRemaining, // Pass remaining time
                                     ),
                                   ],
                                 ),
@@ -1348,15 +1515,23 @@ class _MyHomePageState extends State<MyHomePage> {
                                             icon: Icons.restaurant,
                                             label: 'Meals',
                                             // --- Use state variables ---
-                                            value: '$_mealsTodayCount/$_maxMealsPerDay',
+                                            value:
+                                                '$_mealsTodayCount/$_maxMealsPerDay',
                                             color: Colors.orange,
                                             constraints: constraints,
                                           ),
                                           _buildActivityStat(
-                                            icon: Icons.check_circle_outline, // Changed Icon
-                                            label: 'Tasks Done', // Changed Label
-                                            value: '$_completedTasksCount/${_tasks.length}', // Use calculated values
-                                            color: Colors.green.shade700, // Changed Color
+                                            icon:
+                                                Icons
+                                                    .check_circle_outline, // Changed Icon
+                                            label:
+                                                'Tasks Done', // Changed Label
+                                            value:
+                                                '$_completedTasksCount/${_tasks.length}', // Use calculated values
+                                            color:
+                                                Colors
+                                                    .green
+                                                    .shade700, // Changed Color
                                             constraints: constraints,
                                           ),
                                         ],
@@ -1376,13 +1551,15 @@ class _MyHomePageState extends State<MyHomePage> {
                                         ),
                                         decoration: BoxDecoration(
                                           // Use a color that fits happiness, maybe based on mood
-                                          color: _getStatusTextColor().withOpacity(0.15),
+                                          color: _getStatusTextColor()
+                                              .withOpacity(0.15),
                                           borderRadius: BorderRadius.circular(
                                             12,
                                           ),
                                           border: Border.all(
-                                            color: _getStatusTextColor().withOpacity(0.5)
-                                          )
+                                            color: _getStatusTextColor()
+                                                .withOpacity(0.5),
+                                          ),
                                         ),
                                         child: Row(
                                           mainAxisAlignment:
@@ -1391,7 +1568,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                             Icon(
                                               // Choose an icon for happiness
                                               Icons.favorite,
-                                              color: _getStatusTextColor(), // Use mood color
+                                              color:
+                                                  _getStatusTextColor(), // Use mood color
                                               size: constraints.maxWidth * 0.05,
                                             ),
                                             SizedBox(
@@ -1406,7 +1584,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                                     constraints.maxWidth *
                                                     0.035,
                                                 // Use mood color for text too
-                                                color: _getStatusTextColor().withOpacity(0.9),
+                                                color: _getStatusTextColor()
+                                                    .withOpacity(0.9),
                                                 fontWeight: FontWeight.w500,
                                               ),
                                             ),
@@ -1421,7 +1600,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             ),
                           ),
                         ),
-                
+
                         // User's last message (only shown when there's a message)
                         if (_lastUserMessage != null)
                           Positioned(
@@ -1487,13 +1666,21 @@ class _MyHomePageState extends State<MyHomePage> {
                         // --- MOVED Tips and History Buttons ---
                         Positioned(
                           // Adjust top to vertically align with the pet's center
-                          top: constraints.maxHeight * 0.35 + (constraints.maxWidth * 0.55 / 4), // Centering attempt
+                          top:
+                              constraints.maxHeight * 0.35 +
+                              (constraints.maxWidth *
+                                  0.55 /
+                                  4), // Centering attempt
                           left: 0,
                           right: 0,
                           child: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.08), // Padding from screen edges
+                            padding: EdgeInsets.symmetric(
+                              horizontal: constraints.maxWidth * 0.08,
+                            ), // Padding from screen edges
                             child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween, // Space them out
+                              mainAxisAlignment:
+                                  MainAxisAlignment
+                                      .spaceBetween, // Space them out
                               children: [
                                 // Tips Button - Updated
                                 _buildFeatureButton(
@@ -1502,11 +1689,14 @@ class _MyHomePageState extends State<MyHomePage> {
                                   onPressed: () {
                                     Navigator.push(
                                       context,
-                                      MaterialPageRoute(builder: (context) => DailyTipsScreen()),
+                                      MaterialPageRoute(
+                                        builder: (context) => DailyTipsScreen(),
+                                      ),
                                     );
                                   },
                                   color: Colors.orange,
-                                  size: 40, // Use a fixed size or adjust as needed
+                                  size:
+                                      40, // Use a fixed size or adjust as needed
                                   // disabled: false, // Default
                                   // cooldownRemaining: null, // Default
                                 ),
@@ -1515,21 +1705,33 @@ class _MyHomePageState extends State<MyHomePage> {
                                   icon: Icons.history,
                                   label: 'History',
                                   onPressed: () {
-                                    if (_userId.isNotEmpty) { // Only navigate if user ID is available
+                                    if (_userId.isNotEmpty) {
+                                      // Only navigate if user ID is available
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => ChatHistoryScreen(userId: _userId),
+                                          builder:
+                                              (context) => ChatHistoryScreen(
+                                                userId: _userId,
+                                              ),
                                         ),
                                       );
                                     } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Cannot view history. User not logged in.'), backgroundColor: Colors.orange),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Cannot view history. User not logged in.',
+                                          ),
+                                          backgroundColor: Colors.orange,
+                                        ),
                                       );
                                     }
                                   },
                                   color: Colors.blueGrey,
-                                  size: 40, // Use a fixed size or adjust as needed
+                                  size:
+                                      40, // Use a fixed size or adjust as needed
                                   // disabled: false, // Default
                                   // cooldownRemaining: null, // Default
                                 ),
@@ -1567,7 +1769,8 @@ class _MyHomePageState extends State<MyHomePage> {
                         controller: _chatController,
                         decoration: InputDecoration(
                           hintText: 'Talk to your pet...',
-                          hintStyle: GoogleFonts.fredoka( // Use Fredoka font for hint
+                          hintStyle: GoogleFonts.fredoka(
+                            // Use Fredoka font for hint
                             color: Colors.grey.shade600,
                             fontSize: 16, // Adjusted fixed size
                           ),
@@ -1575,20 +1778,31 @@ class _MyHomePageState extends State<MyHomePage> {
                           fillColor: Colors.white, // Cleaner background
                           // Remove the generic border
                           // border: OutlineInputBorder(...)
-                          enabledBorder: OutlineInputBorder( // Border when not focused
+                          enabledBorder: OutlineInputBorder(
+                            // Border when not focused
                             borderRadius: BorderRadius.circular(30),
-                            borderSide: BorderSide(color: Colors.grey.shade300, width: 1.0),
+                            borderSide: BorderSide(
+                              color: Colors.grey.shade300,
+                              width: 1.0,
+                            ),
                           ),
-                          focusedBorder: OutlineInputBorder( // Border when focused
+                          focusedBorder: OutlineInputBorder(
+                            // Border when focused
                             borderRadius: BorderRadius.circular(30),
-                            borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
+                            borderSide: BorderSide(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 1.5,
+                            ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric( // Fixed padding
+                          contentPadding: const EdgeInsets.symmetric(
+                            // Fixed padding
                             horizontal: 20,
                             vertical: 15,
                           ),
                         ),
-                        style: GoogleFonts.fredoka(fontSize: 16), // Use Fredoka font for input
+                        style: GoogleFonts.fredoka(
+                          fontSize: 16,
+                        ), // Use Fredoka font for input
                         onSubmitted: (_) => _sendMessage(),
                       ),
                     ),
@@ -1723,7 +1937,10 @@ class _MyHomePageState extends State<MyHomePage> {
     Duration? cooldownRemaining, // Add optional remaining duration
   }) {
     final effectiveColor = disabled ? Colors.grey : color;
-    final bool showTimer = disabled && cooldownRemaining != null && cooldownRemaining > Duration.zero;
+    final bool showTimer =
+        disabled &&
+        cooldownRemaining != null &&
+        cooldownRemaining > Duration.zero;
 
     return Opacity(
       opacity: disabled ? 0.5 : 1.0,
@@ -1737,30 +1954,39 @@ class _MyHomePageState extends State<MyHomePage> {
               color: effectiveColor.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
-            child: Center( // Center the icon or timer text
-              child: showTimer
-                  ? Text(
-                      '${cooldownRemaining.inSeconds}', // Display remaining seconds
-                      style: GoogleFonts.fredoka(
-                        fontSize: size * 0.4, // Adjust font size relative to button size
-                        fontWeight: FontWeight.bold,
-                        color: effectiveColor,
+            child: Center(
+              // Center the icon or timer text
+              child:
+                  showTimer
+                      ? Text(
+                        '${cooldownRemaining.inSeconds}', // Display remaining seconds
+                        style: GoogleFonts.fredoka(
+                          fontSize:
+                              size *
+                              0.4, // Adjust font size relative to button size
+                          fontWeight: FontWeight.bold,
+                          color: effectiveColor,
+                        ),
+                      )
+                      : IconButton(
+                        // Use IconButton for standard behavior (tooltip, padding)
+                        icon: Icon(icon, color: effectiveColor),
+                        onPressed: onPressed,
+                        iconSize: size * 0.6,
+                        padding: EdgeInsets.zero, // Use Center for positioning
+                        tooltip: disabled ? '$label (Resting)' : label,
+                        splashRadius:
+                            size * 0.7, // Adjust splash radius if needed
                       ),
-                    )
-                  : IconButton( // Use IconButton for standard behavior (tooltip, padding)
-                      icon: Icon(icon, color: effectiveColor),
-                      onPressed: onPressed,
-                      iconSize: size * 0.6,
-                      padding: EdgeInsets.zero, // Use Center for positioning
-                      tooltip: disabled ? '$label (Resting)' : label,
-                      splashRadius: size * 0.7, // Adjust splash radius if needed
-                    ),
-            )
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: GoogleFonts.fredoka(fontSize: 12, color: Colors.grey.shade700),
+            style: GoogleFonts.fredoka(
+              fontSize: 12,
+              color: Colors.grey.shade700,
+            ),
           ),
         ],
       ),
@@ -1992,37 +2218,44 @@ class _MyHomePageState extends State<MyHomePage> {
 
   // Method to be passed as callback
   void _refreshCoinDisplay() {
-     _loadHappinessCoins();
+    _loadHappinessCoins();
   }
 
   // Navigation method
   void _navigateToTasks() {
-     final attendanceService = AttendanceService();
-     _petModel.loadPetData().then((latestPetData) {
-        if (!mounted) return;
-        Navigator.push(
-           context,
-           MaterialPageRoute(
-              builder: (context) => PetTasksScreen(
-                 petModel: _petModel,
-                 petData: latestPetData,
-                 attendanceService: attendanceService,
-                 onCoinsUpdated: _refreshCoinDisplay,
+    final attendanceService = AttendanceService();
+    _petModel
+        .loadPetData()
+        .then((latestPetData) {
+          if (!mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) => PetTasksScreen(
+                    petModel: _petModel,
+                    petData: latestPetData,
+                    attendanceService: attendanceService,
+                    onCoinsUpdated: _refreshCoinDisplay,
+                  ),
+            ),
+          ).then((_) {
+            // Refresh data when returning
+            _initializePet(); // Reloads data and updates stats
+            _loadHappinessCoins(); // Refresh coin display too
+          });
+        })
+        .catchError((error) {
+          print("Error loading pet data before navigating to tasks: $error");
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Could not load tasks. Please try again.'),
+                backgroundColor: Colors.red,
               ),
-           ),
-        ).then((_) {
-           // Refresh data when returning
-           _initializePet(); // Reloads data and updates stats
-           _loadHappinessCoins(); // Refresh coin display too
+            );
+          }
         });
-     }).catchError((error) {
-        print("Error loading pet data before navigating to tasks: $error");
-        if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Could not load tasks. Please try again.'), backgroundColor: Colors.red),
-           );
-        }
-     });
   }
 
   // --- Cooldown Helper Methods ---
@@ -2045,56 +2278,63 @@ class _MyHomePageState extends State<MyHomePage> {
 
     Duration remaining = _getRemainingCooldown(interactionType);
     if (remaining > Duration.zero) {
-      if (mounted) { // Check if widget is still mounted
-         setState(() {
-             _remainingCooldowns[interactionType] = remaining;
-         });
+      if (mounted) {
+        // Check if widget is still mounted
+        setState(() {
+          _remainingCooldowns[interactionType] = remaining;
+        });
       }
 
       // Start a new timer
-      _cooldownTimers[interactionType] = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (!mounted) { // Check again inside timer callback
-           timer.cancel();
-           _cooldownTimers.remove(interactionType);
-           return;
-        }
-        final currentRemaining = _getRemainingCooldown(interactionType);
-        setState(() {
-          _remainingCooldowns[interactionType] = currentRemaining;
-        });
+      _cooldownTimers[interactionType] = Timer.periodic(
+        const Duration(seconds: 1),
+        (timer) {
+          if (!mounted) {
+            // Check again inside timer callback
+            timer.cancel();
+            _cooldownTimers.remove(interactionType);
+            return;
+          }
+          final currentRemaining = _getRemainingCooldown(interactionType);
+          setState(() {
+            _remainingCooldowns[interactionType] = currentRemaining;
+          });
 
-        if (currentRemaining <= Duration.zero) {
-          timer.cancel();
-          _cooldownTimers.remove(interactionType);
-          print("Cooldown finished for $interactionType");
-          // Final update to ensure button enables
-          if (mounted) setState(() {});
-        }
-      });
+          if (currentRemaining <= Duration.zero) {
+            timer.cancel();
+            _cooldownTimers.remove(interactionType);
+            print("Cooldown finished for $interactionType");
+            // Final update to ensure button enables
+            if (mounted) setState(() {});
+          }
+        },
+      );
     } else {
-       // Ensure remaining time is cleared if cooldown ended before timer logic
-       if (_remainingCooldowns.containsKey(interactionType)) {
-           if (mounted) {
-              setState(() {
-                 _remainingCooldowns.remove(interactionType);
-              });
-           }
-       }
-       _cooldownTimers.remove(interactionType); // Remove any stale timer entry
+      // Ensure remaining time is cleared if cooldown ended before timer logic
+      if (_remainingCooldowns.containsKey(interactionType)) {
+        if (mounted) {
+          setState(() {
+            _remainingCooldowns.remove(interactionType);
+          });
+        }
+      }
+      _cooldownTimers.remove(interactionType); // Remove any stale timer entry
     }
   }
 
   // Helper to update all timers, useful after loading data
   void _updateAllCooldownTimers() {
-     const interactionTypes = ['pet', 'feed', 'play', 'groom'];
-     for (var type in interactionTypes) {
-        _updateCooldownTimer(type);
-     }
+    const interactionTypes = ['pet', 'feed', 'play', 'groom'];
+    for (var type in interactionTypes) {
+      _updateCooldownTimer(type);
+    }
   }
 
   // Combined initialization
   Future<void> _initializePetAndLoadChat() async {
-    print('[_initializePetAndLoadChat] Initializing pet and loading today\'s chat...');
+    print(
+      '[_initializePetAndLoadChat] Initializing pet and loading today\'s chat...',
+    );
     try {
       await _petModel.initializePet();
       print('[_initializePetAndLoadChat] _petModel.initializePet() completed.');
@@ -2111,53 +2351,63 @@ class _MyHomePageState extends State<MyHomePage> {
     } catch (e) {
       print('Failed to initialize pet or load chat: $e');
       if (mounted) {
-          setState(() {
-             _petStatus = 'Error';
-             _petsTodayCount = 0;
-             _mealsTodayCount = 0;
-             _completedTasksCount = 0; // Reset task count on error
-             _messages.clear(); // Clear messages on error
-             _petData = {'happiness': 0, 'lastInteractionTimes': {}}; // Ensure lastInteractionTimes exists
-          });
+        setState(() {
+          _petStatus = 'Error';
+          _petsTodayCount = 0;
+          _mealsTodayCount = 0;
+          _completedTasksCount = 0; // Reset task count on error
+          _messages.clear(); // Clear messages on error
+          _petData = {
+            'happiness': 0,
+            'lastInteractionTimes': {},
+          }; // Ensure lastInteractionTimes exists
+        });
       }
     }
   }
 
   // New method to load chat history for the current day
   Future<void> _loadTodaysChatHistory() async {
-     if (_userId.isEmpty) return; // Don't load if no user
-     print("[_loadTodaysChatHistory] Loading chat history for today...");
-     final todayString = DateFormat('yyyy-MM-dd').format(DateTime.now());
-     try {
-        final List<Map<String, dynamic>> historyData = await _petModel.loadChatHistoryForDate(todayString);
-        final List<ChatMessage> todaysMessages = historyData
-            .map((data) => ChatMessage.fromMap(data))
-            .toList();
+    if (_userId.isEmpty) return; // Don't load if no user
+    print("[_loadTodaysChatHistory] Loading chat history for today...");
+    final todayString = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    try {
+      final List<Map<String, dynamic>> historyData = await _petModel
+          .loadChatHistoryForDate(todayString);
+      final List<ChatMessage> todaysMessages =
+          historyData.map((data) => ChatMessage.fromMap(data)).toList();
 
-        // Sort messages by timestamp just in case they aren't stored perfectly ordered
-        todaysMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      // Sort messages by timestamp just in case they aren't stored perfectly ordered
+      todaysMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
-        if (mounted) {
-           setState(() {
-              _messages.clear(); // Clear previous messages (if any)
-              _messages.addAll(todaysMessages); // Add loaded messages
-           });
-           print("[_loadTodaysChatHistory] Loaded ${_messages.length} messages for today.");
-        }
-     } catch (e) {
-        print("Error loading today's chat history: $e");
-        if (mounted) {
-           setState(() { _messages.clear(); }); // Clear messages on error
-           ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Could not load today\'s chat: $e'), backgroundColor: Colors.red),
-           );
-        }
-     }
+      if (mounted) {
+        setState(() {
+          _messages.clear(); // Clear previous messages (if any)
+          _messages.addAll(todaysMessages); // Add loaded messages
+        });
+        print(
+          "[_loadTodaysChatHistory] Loaded ${_messages.length} messages for today.",
+        );
+      }
+    } catch (e) {
+      print("Error loading today's chat history: $e");
+      if (mounted) {
+        setState(() {
+          _messages.clear();
+        }); // Clear messages on error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not load today\'s chat: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   // Update the old _initializePet to call the new combined one
   Future<void> _initializePet() async {
-     await _initializePetAndLoadChat();
+    await _initializePetAndLoadChat();
   }
 }
 

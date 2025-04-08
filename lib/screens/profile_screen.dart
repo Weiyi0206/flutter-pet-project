@@ -1,6 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -34,9 +37,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final newDisplayName = _displayNameController.text.trim();
     if (newDisplayName == _currentUser?.displayName) {
       // No changes made
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No changes detected.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No changes detected.')));
       return;
     }
 
@@ -76,10 +79,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Profile',
-          style: GoogleFonts.fredoka(),
-        ),
+        title: Text('Profile', style: GoogleFonts.fredoka()),
         backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
       ),
       body: Padding(
@@ -89,16 +89,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             const SizedBox(height: 20),
             Center(
-              child: CircleAvatar(
-                radius: 50,
-                backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                child: Icon(
-                  Icons.person,
-                  size: 50,
-                  color: Theme.of(context).colorScheme.onSecondaryContainer,
-                ),
+              child: Stack(
+                children: [
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.secondaryContainer,
+                      child: ClipOval(
+                        child:
+                            _currentUser?.photoURL != null
+                                ? Image.network(
+                                  _currentUser!.photoURL!,
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Icon(
+                                      Icons.person,
+                                      size: 50,
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSecondaryContainer,
+                                    );
+                                  },
+                                )
+                                : Icon(
+                                  Icons.person,
+                                  size: 50,
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.onSecondaryContainer,
+                                ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+
             const SizedBox(height: 30),
             Text(
               'Email:',
@@ -128,24 +160,85 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 30),
             Center(
-              child: _isLoading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton.icon(
-                      onPressed: _saveChanges,
-                      icon: const Icon(Icons.save),
-                      label: Text('Save Changes', style: GoogleFonts.fredoka()),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                        textStyle: GoogleFonts.fredoka(fontSize: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+              child:
+                  _isLoading
+                      ? const CircularProgressIndicator()
+                      : ElevatedButton.icon(
+                        onPressed: _saveChanges,
+                        icon: const Icon(Icons.save),
+                        label: Text(
+                          'Save Changes',
+                          style: GoogleFonts.fredoka(),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 30,
+                            vertical: 15,
+                          ),
+                          textStyle: GoogleFonts.fredoka(fontSize: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
-                    ),
             ),
           ],
         ),
       ),
     );
   }
-} 
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final File imageFile = File(pickedFile.path);
+
+      // Define Firebase Storage reference (e.g., profile_pics/user_uid.jpg)
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_pics')
+          .child('${_currentUser!.uid}.jpg');
+
+      // Upload the file
+      await storageRef.putFile(imageFile);
+
+      // Get the download URL
+      final downloadUrl = await storageRef.getDownloadURL();
+
+      // Update Firebase Auth profile photoURL
+      //await _currentUser!.updatePhotoURL(downloadUrl);
+      await FirebaseAuth.instance.currentUser!.updatePhotoURL(downloadUrl);
+
+      // Refresh UI
+      setState(() {});
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile picture updated!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error uploading image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+}
