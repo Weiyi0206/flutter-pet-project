@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:helloworld/services/attendance_service.dart';
 import 'package:helloworld/widgets/attendance_calendar.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:math' as math;
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
@@ -35,6 +36,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
     );
+
+    // Ensure data loads by using a post-frame callback
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAttendanceData();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload data when dependencies change (like coming back to this screen)
     _loadAttendanceData();
   }
 
@@ -45,29 +57,52 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   }
 
   Future<void> _loadAttendanceData() async {
+    // Remove the condition that prevents loading
+    print('DEBUG: Starting to load attendance data...');
     setState(() {
       _isLoading = true;
     });
 
     try {
+      print('DEBUG: Loading attendance data for current user');
       final datesWithMoods =
           await _attendanceService.getAttendanceDatesWithMoods();
-      final streak = await _attendanceService.getStreak();
-      final checkedIn = await _attendanceService.hasCheckedInToday();
-      final totalCoins = await _attendanceService.getTotalCoins();
+      print('DEBUG: Loaded ${datesWithMoods.length} attendance dates');
 
-      setState(() {
-        _attendanceDatesWithMoods = datesWithMoods;
-        _streak = streak;
-        _checkedInToday = checkedIn;
-        _totalCoins = totalCoins;
-        _isLoading = false;
-      });
+      final streak = await _attendanceService.getStreak();
+      print('DEBUG: Current streak: $streak');
+
+      final checkedIn = await _attendanceService.hasCheckedInToday();
+      print('DEBUG: Has checked in today: $checkedIn');
+
+      final totalCoins = await _attendanceService.getTotalCoins();
+      print('DEBUG: Total coins: $totalCoins');
+
+      if (mounted) {
+        setState(() {
+          _attendanceDatesWithMoods = datesWithMoods;
+          _streak = streak;
+          _checkedInToday = checkedIn;
+          _totalCoins = totalCoins;
+          _isLoading = false;
+        });
+        print('DEBUG: Successfully updated state with attendance data');
+      }
     } catch (e) {
-      print('Error loading attendance data: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      print('ERROR loading attendance data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        // Show error message to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error loading data: ${e.toString().substring(0, math.min(e.toString().length, 50))}...',
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -80,45 +115,115 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     {'emoji': '😰', 'label': 'Anxious', 'color': Colors.purple.shade300},
   ];
 
+  // Show a SnackBar with coins earned message
+  void _showCoinsEarnedMessage(int earned) {
+    if (earned > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Congratulations! You earned $earned coins!'),
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
   Future<void> _handleCheckIn() async {
     final selectedMood = await _showMoodSelectionDialog();
     if (selectedMood == null) return;
 
-    final int prevCoins = await _attendanceService.getTotalCoins();
+    // Show loading indicator while checking in
+    setState(() {
+      _isLoading = true;
+    });
 
-    final result = await _attendanceService.markAttendanceWithMood(
-      selectedMood,
-    );
+    try {
+      final int prevCoins = await _attendanceService.getTotalCoins();
+      print('DEBUG: Coins before check-in: $prevCoins');
 
-    if (result.success) {
-      final int newCoins = result.totalCoins;
-      final int earned = newCoins - prevCoins;
+      final result = await _attendanceService.markAttendanceWithMood(
+        selectedMood,
+      );
 
-      setState(() {
-        _lastReward = result.reward;
-        _showRewardAnimation = true;
-        _streak = result.streak;
-        _checkedInToday = true;
-        _totalCoins = result.totalCoins;
-        _earnedCoins = earned;
-      });
+      if (result.success) {
+        // Fetch the latest coins directly to ensure accuracy
+        final int newCoins = await _attendanceService.getTotalCoins();
+        print('DEBUG: Coins after check-in: $newCoins');
+        final int earned = newCoins - prevCoins;
+        print('DEBUG: Earned coins: $earned');
 
-      _loadAttendanceData();
+        // Refresh attendance data to get updated calendar info
+        final datesWithMoods =
+            await _attendanceService.getAttendanceDatesWithMoods();
+        print(
+          'DEBUG: Fetched ${datesWithMoods.length} dates with moods for calendar',
+        );
 
-      _animationController.reset();
-      _animationController.forward();
-
-      Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
           setState(() {
-            _showRewardAnimation = false;
+            _lastReward = result.reward;
+            _showRewardAnimation = true;
+            _streak = result.streak;
+            _checkedInToday = true;
+            _totalCoins = newCoins;
+            _earnedCoins = earned;
+            _attendanceDatesWithMoods = datesWithMoods;
+            _isLoading = false;
+          });
+
+          _animationController.reset();
+          _animationController.forward();
+
+          // Show coins earned message
+          _showCoinsEarnedMessage(earned);
+
+          // Auto return to main screen with result after a timeout if user doesn't interact
+          Future.delayed(const Duration(seconds: 5), () {
+            if (mounted && _showRewardAnimation) {
+              setState(() {
+                _showRewardAnimation = false;
+              });
+
+              // Return the earned coins data to the main screen
+              Navigator.of(
+                context,
+              ).pop({'earnedCoins': _earnedCoins, 'totalCoins': _totalCoins});
+            }
           });
         }
-      });
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(result.message)));
+      } else {
+        // In case of an error, still update the UI with the latest data
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(result.message)));
+
+          // Reload data to ensure UI is synced
+          _loadAttendanceData();
+        }
+      }
+    } catch (e) {
+      print('ERROR during check-in: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error during check-in: ${e.toString().substring(0, math.min(e.toString().length, 50))}...',
+            ),
+          ),
+        );
+
+        // Try to reload data even after error
+        _loadAttendanceData();
+      }
     }
   }
 
@@ -193,63 +298,84 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Daily Attendance',
-          style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+    return PopScope(
+      onPopInvoked: (didPop) {
+        // If user earned coins but is going back without using the "Collect" button,
+        // we need to send the result back manually
+        if (didPop && _earnedCoins > 0) {
+          print('DEBUG: User navigating back with earned coins: $_earnedCoins');
+
+          // Note: With onPopInvoked we don't need to explicitly call pop again,
+          // we just need to ensure that on the main screen they check for the result
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            'Daily Attendance',
+            style: GoogleFonts.fredoka(fontWeight: FontWeight.bold),
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              // When user manually presses back button, send back coins data
+              Navigator.of(
+                context,
+              ).pop({'earnedCoins': _earnedCoins, 'totalCoins': _totalCoins});
+            },
+          ),
         ),
-      ),
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Stack(
-                children: [
-                  SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildCoinCounter(),
-                          const SizedBox(height: 16),
-                          _buildStreakInfo(),
-                          const SizedBox(height: 16),
-                          Card(
-                            elevation: 4,
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    'Attendance Calendar',
-                                    style: GoogleFonts.fredoka(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
+        body:
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Stack(
+                  children: [
+                    SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildCoinCounter(),
+                            const SizedBox(height: 16),
+                            _buildStreakInfo(),
+                            const SizedBox(height: 16),
+                            Card(
+                              elevation: 4,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      'Attendance Calendar',
+                                      style: GoogleFonts.fredoka(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  AttendanceCalendar(
-                                    markedDatesWithMoods:
-                                        _attendanceDatesWithMoods,
-                                    selectedDate: _selectedDate,
-                                    onDaySelected: _onDateSelected,
-                                  ),
-                                ],
+                                    const SizedBox(height: 16),
+                                    AttendanceCalendar(
+                                      markedDatesWithMoods:
+                                          _attendanceDatesWithMoods,
+                                      selectedDate: _selectedDate,
+                                      onDaySelected: _onDateSelected,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                          _buildCheckInButton(),
-                          const SizedBox(height: 24),
-                          _buildRewardsInfo(),
-                        ],
+                            const SizedBox(height: 24),
+                            _buildCheckInButton(),
+                            const SizedBox(height: 24),
+                            _buildRewardsInfo(),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  if (_showRewardAnimation) _buildRewardAnimation(),
-                ],
-              ),
+                    if (_showRewardAnimation) _buildRewardAnimation(),
+                  ],
+                ),
+      ),
     );
   }
 
@@ -295,9 +421,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               ],
             ),
             IconButton(
-              icon: const Icon(Icons.info_outline, color: Colors.black54),
-              onPressed: () {
-                _showCoinInfoDialog();
+              icon: const Icon(Icons.refresh, color: Colors.black54),
+              onPressed: () async {
+                await _loadAttendanceData();
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Data refreshed')));
               },
             ),
           ],
@@ -590,6 +719,26 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  // Hide the reward animation
+                  setState(() {
+                    _showRewardAnimation = false;
+                  });
+
+                  // Return to main screen with result
+                  Navigator.of(context).pop({
+                    'earnedCoins': _earnedCoins,
+                    'totalCoins': _totalCoins,
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text('Collect', style: GoogleFonts.fredoka()),
               ),
             ],
           ),

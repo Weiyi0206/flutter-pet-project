@@ -207,16 +207,19 @@ class _AttendanceCalendarState extends State<AttendanceCalendar> {
                   ? Stack(
                     alignment: Alignment.center,
                     children: [
-                      // Date number stays centered and slightly smaller
-                      Text(
-                        day.toString(),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: isSelected ? Colors.white : null,
-                          fontWeight: isCurrentDay ? FontWeight.bold : null,
-                          fontSize: 10, // Smaller to make room for the emoji
+                      // Date number stays at the top
+                      Positioned(
+                        top: 2,
+                        child: Text(
+                          day.toString(),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: isSelected ? Colors.white : null,
+                            fontWeight: isCurrentDay ? FontWeight.bold : null,
+                            fontSize: 10, // Smaller to make room for the emoji
+                          ),
                         ),
                       ),
-                      // Show mood emoji on top of the date
+                      // Show mood emoji below the date
                       if (moodEmoji != null)
                         Positioned(
                           bottom: 2,

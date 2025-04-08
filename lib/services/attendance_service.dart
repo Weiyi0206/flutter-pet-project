@@ -47,25 +47,63 @@ class AttendanceService {
   // Get the current user ID or return null if not logged in
   String? get _userId => _auth.currentUser?.uid;
 
+  // Helper method to get user-specific key for SharedPreferences
+  String _getUserKey(String baseKey) {
+    if (_userId == null) return baseKey;
+    return '${_userId}_$baseKey';
+  }
+
+  // Clear all attendance data for current user from SharedPreferences
+  // This should be called when user logs out
+  Future<void> clearAttendanceData() async {
+    if (_userId == null) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Remove user-specific keys
+      await prefs.remove(_getUserKey(_lastCheckInKey));
+      await prefs.remove(_getUserKey(_streakKey));
+      await prefs.remove(_getUserKey(_attendanceDatesKey));
+      await prefs.remove(_getUserKey(_totalCoinsKey));
+
+      // For backward compatibility, also clear keys without user prefix
+      await prefs.remove(_lastCheckInKey);
+      await prefs.remove(_streakKey);
+      await prefs.remove(_attendanceDatesKey);
+
+      print('Cleared attendance data for user: $_userId');
+    } catch (e) {
+      print('Error clearing attendance data: $e');
+    }
+  }
+
   // Get total happiness coins earned
   Future<int> getTotalCoins() async {
     if (_userId == null || _userId!.isEmpty) return 0;
 
     // --- If Firestore is primary source (Recommended) ---
-     try {
-        final doc = await _firestore.collection('users').doc(_userId).get();
-        if (doc.exists && doc.data() != null) {
-            return doc.data()!['totalCoins'] as int? ?? 0; // Use your actual field name
-        } else {
-            // User doc might not exist yet, check SharedPreferences as fallback or return 0
-            final prefs = await SharedPreferences.getInstance();
-            return prefs.getInt('${_userId}_$_totalCoinsKey') ?? 0;
-        }
-     } catch (e) {
-        print("Error getting total coins from Firestore: $e. Falling back to SharedPreferences.");
+    try {
+      final doc = await _firestore.collection('users').doc(_userId).get();
+      if (doc.exists && doc.data() != null) {
+        // Check for both field names for backward compatibility
+        final totalCoins = doc.data()!['totalCoins'] as int?;
+        final totalHappinessCoins = doc.data()!['totalHappinessCoins'] as int?;
+
+        // Use totalCoins if available, otherwise use totalHappinessCoins, default to 0 if neither exists
+        return totalCoins ?? totalHappinessCoins ?? 0;
+      } else {
+        // User doc might not exist yet, check SharedPreferences as fallback or return 0
         final prefs = await SharedPreferences.getInstance();
-        return prefs.getInt('${_userId}_$_totalCoinsKey') ?? 0;
-     }
+        return prefs.getInt(_getUserKey(_totalCoinsKey)) ?? 0;
+      }
+    } catch (e) {
+      print(
+        "Error getting total coins from Firestore: $e. Falling back to SharedPreferences.",
+      );
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getInt(_getUserKey(_totalCoinsKey)) ?? 0;
+    }
 
     // --- If SharedPreferences is primary source ---
     /*
@@ -79,17 +117,28 @@ class AttendanceService {
     if (_userId == null) return;
 
     final prefs = await SharedPreferences.getInstance();
-    final currentCoins = prefs.getInt('${_userId}_$_totalCoinsKey') ?? 0;
+    final currentCoins = prefs.getInt(_getUserKey(_totalCoinsKey)) ?? 0;
     final newTotal = currentCoins + additionalCoins;
 
-    await prefs.setInt('${_userId}_$_totalCoinsKey', newTotal);
+    print(
+      'DEBUG: Adding $additionalCoins coins. Current: $currentCoins, New total: $newTotal',
+    );
+    await prefs.setInt(_getUserKey(_totalCoinsKey), newTotal);
 
     // Also update in Firestore for backup
     try {
+      // Use FieldValue.increment for safer concurrent updates
       await _firestore.collection('users').doc(_userId).set({
-        'totalHappinessCoins': newTotal,
+        'totalCoins': FieldValue.increment(additionalCoins),
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+
+      // For backward compatibility, also update the old field name
+      await _firestore.collection('users').doc(_userId).set({
+        'totalHappinessCoins': FieldValue.increment(additionalCoins),
+      }, SetOptions(merge: true));
+
+      print('DEBUG: Successfully updated coins in Firestore');
     } catch (e) {
       print('Error updating coins in Firestore: $e');
     }
@@ -113,7 +162,10 @@ class AttendanceService {
         final data = doc.data();
         return {
           'date': doc.id,
-          'coins': data['reward']?['coinReward'] ?? data['reward']?['happinessBoost'] ?? 0,
+          'coins':
+              data['reward']?['coinReward'] ??
+              data['reward']?['happinessBoost'] ??
+              0,
           'mood': data['mood'] ?? 'Unknown',
           'moodEmoji': data['moodEmoji'] ?? '😐',
         };
@@ -138,7 +190,7 @@ class AttendanceService {
     if (_userId == null) return false;
 
     final prefs = await SharedPreferences.getInstance();
-    final lastCheckIn = prefs.getString(_lastCheckInKey);
+    final lastCheckIn = prefs.getString(_getUserKey(_lastCheckInKey));
 
     if (lastCheckIn == null) return false;
 
@@ -151,21 +203,34 @@ class AttendanceService {
     if (_userId == null) return 0;
 
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_streakKey) ?? 0;
+    return prefs.getInt(_getUserKey(_streakKey)) ?? 0;
   }
 
   // Get all attendance dates for the calendar
   Future<List<Map<String, dynamic>>> getAttendanceDatesWithMoods() async {
     if (_userId == null) return [];
 
+    print('DEBUG: Getting attendance dates with moods for user: $_userId');
+
     final prefs = await SharedPreferences.getInstance();
-    final dateStrings = prefs.getStringList(_attendanceDatesKey) ?? [];
+    final dateStrings =
+        prefs.getStringList(_getUserKey(_attendanceDatesKey)) ?? [];
+
+    print(
+      'DEBUG: Found ${dateStrings.length} attendance dates in SharedPreferences',
+    );
+
     final moodData = <Map<String, dynamic>>[];
 
     // Get mood data for each date
     for (final dateStr in dateStrings) {
       final date = DateTime.parse(dateStr);
-      String? moodEmoji = prefs.getString('${_userId}_mood_$dateStr');
+      final moodKey = _getUserKey('mood_$dateStr');
+      String? moodEmoji = prefs.getString(moodKey);
+
+      print(
+        'DEBUG: Loading mood for date $dateStr with key $moodKey: ${moodEmoji ?? 'null'}',
+      );
 
       moodData.add({
         'date': date,
@@ -174,6 +239,7 @@ class AttendanceService {
       });
     }
 
+    print('DEBUG: Returning ${moodData.length} dates with moods');
     return moodData;
   }
 
@@ -182,7 +248,8 @@ class AttendanceService {
     if (_userId == null) return [];
 
     final prefs = await SharedPreferences.getInstance();
-    final dateStrings = prefs.getStringList(_attendanceDatesKey) ?? [];
+    final dateStrings =
+        prefs.getStringList(_getUserKey(_attendanceDatesKey)) ?? [];
 
     return dateStrings.map((dateStr) {
       return DateTime.parse(dateStr);
@@ -242,8 +309,8 @@ class AttendanceService {
     ).format(DateTime.now().subtract(const Duration(days: 1)));
 
     // Check if the user checked in yesterday to maintain streak
-    final lastCheckIn = prefs.getString(_lastCheckInKey);
-    int currentStreak = prefs.getInt(_streakKey) ?? 0;
+    final lastCheckIn = prefs.getString(_getUserKey(_lastCheckInKey));
+    int currentStreak = prefs.getInt(_getUserKey(_streakKey)) ?? 0;
 
     if (lastCheckIn == yesterday) {
       // Consecutive day, increase streak
@@ -257,18 +324,25 @@ class AttendanceService {
     }
 
     // Save the current streak and today's check-in
-    await prefs.setString(_lastCheckInKey, today);
-    await prefs.setInt(_streakKey, currentStreak);
+    await prefs.setString(_getUserKey(_lastCheckInKey), today);
+    await prefs.setInt(_getUserKey(_streakKey), currentStreak);
 
     // Add today's date to attendance dates list
     List<String> attendanceDates =
-        prefs.getStringList(_attendanceDatesKey) ?? [];
+        prefs.getStringList(_getUserKey(_attendanceDatesKey)) ?? [];
     attendanceDates.add(today);
-    await prefs.setStringList(_attendanceDatesKey, attendanceDates);
+    await prefs.setStringList(
+      _getUserKey(_attendanceDatesKey),
+      attendanceDates,
+    );
 
     // Save the mood emoji for this date
     final moodEmoji = _getMoodEmoji(mood);
-    await prefs.setString('${_userId}_mood_$today', moodEmoji);
+    final moodKey = _getUserKey('mood_$today');
+    await prefs.setString(moodKey, moodEmoji);
+    print(
+      'DEBUG: Saved mood emoji $moodEmoji for date $today with key $moodKey',
+    );
 
     // Create reward based on streak
     AttendanceReward reward;
@@ -296,7 +370,9 @@ class AttendanceService {
     // Update total coins with reward only
     await _updateTotalCoins(reward.coinReward + moodBonus);
 
+    // Fetch the latest coin count after updating
     final totalCoins = await getTotalCoins();
+    print('DEBUG: Updated total coins after check-in: $totalCoins');
 
     // Save check-in to Firestore
     try {
@@ -310,10 +386,7 @@ class AttendanceService {
             'streak': currentStreak,
             'mood': mood,
             'moodEmoji': moodEmoji,
-            'reward': {
-              'name': reward.name,
-              'coinReward': reward.coinReward,
-            },
+            'reward': {'name': reward.name, 'coinReward': reward.coinReward},
             'moodBonus': moodBonus,
             'totalCoinsEarned': reward.coinReward + moodBonus,
             'timestamp': FieldValue.serverTimestamp(),
@@ -336,8 +409,11 @@ class AttendanceService {
     );
   }
 
-  // Combined function for check-in, mood tracking, and emotion recording 
-  Future<AttendanceResult> checkInWithEmotionTracking(String mood, {String? note}) async {
+  // Combined function for check-in, mood tracking, and emotion recording
+  Future<AttendanceResult> checkInWithEmotionTracking(
+    String mood, {
+    String? note,
+  }) async {
     if (_userId == null) {
       return AttendanceResult(
         success: false,
@@ -346,75 +422,80 @@ class AttendanceService {
         totalCoins: 0,
       );
     }
-    
+
     // First mark attendance and get streak/reward information
     final attendanceResult = await markAttendanceWithMood(mood);
-    
+
     // If attendance check-in was successful, also record the emotion with optional note
     if (attendanceResult.success) {
       try {
         final now = DateTime.now();
         final dateStr = DateFormat('yyyy-MM-dd').format(now);
         final timeStr = DateFormat('HH:mm:ss').format(now);
-        
+
         // Create a record in the emotions collection
         await _firestore
             .collection('users')
             .doc(_userId)
             .collection('emotions')
             .add({
-          'emotion': mood,
-          'note': note,
-          'date': dateStr,
-          'time': timeStr,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-        
+              'emotion': mood,
+              'note': note,
+              'date': dateStr,
+              'time': timeStr,
+              'timestamp': FieldValue.serverTimestamp(),
+            });
+
         print('DEBUG: Successfully recorded emotion with check-in: $mood');
+        print('DEBUG: Total coins in result: ${attendanceResult.totalCoins}');
       } catch (e) {
         print('Error recording emotion during check-in: $e');
         // Continue anyway since the attendance was marked successfully
       }
     }
-    
+
     return attendanceResult;
   }
 
   Future<void> addCoins(int amount) async {
-    if (_userId == null || _userId!.isEmpty || amount <= 0) return; // Basic validation
+    if (_userId == null || _userId!.isEmpty || amount <= 0)
+      return; // Basic validation
 
     // --- Option 1: Update Firestore Directly (Recommended for persistence) ---
-    final userDocRef = _firestore.collection('users').doc(_userId); // Adjust if your collection/doc path is different
+    final userDocRef = _firestore
+        .collection('users')
+        .doc(_userId); // Adjust if your collection/doc path is different
     try {
       // Use FieldValue.increment for safe addition
       // Make sure 'totalCoins' (or your field name) exists in the user document
       await userDocRef.update({
-        'totalCoins': FieldValue.increment(amount), // Replace 'totalCoins' with your actual field name
+        'totalCoins': FieldValue.increment(
+          amount,
+        ), // Replace 'totalCoins' with your actual field name
       });
-      print("[AttendanceService] Added $amount coins for user $_userId in Firestore.");
+      print(
+        "[AttendanceService] Added $amount coins for user $_userId in Firestore.",
+      );
 
       // --- Also update SharedPreferences for immediate local consistency (Optional but good) ---
       final prefs = await SharedPreferences.getInstance();
-      final currentCoins = prefs.getInt('${_userId}_$_totalCoinsKey') ?? 0; // Use user-specific key
-      await prefs.setInt('${_userId}_$_totalCoinsKey', currentCoins + amount);
+      final currentCoins = prefs.getInt(_getUserKey(_totalCoinsKey)) ?? 0;
+      await prefs.setInt(_getUserKey(_totalCoinsKey), currentCoins + amount);
       print("[AttendanceService] Updated SharedPreferences coins locally.");
-
-
     } catch (e) {
       print("Error adding coins for user $_userId in Firestore: $e");
       // Consider creating the field if it doesn't exist or the user doc doesn't exist
       // This might happen on the very first coin award
-       try {
-          await userDocRef.set({'totalCoins': amount}, SetOptions(merge: true));
-          print("[AttendanceService] Initialized coins field for user $_userId.");
-          // Update SharedPreferences too if initializing
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setInt('${_userId}_$_totalCoinsKey', amount);
-
-       } catch (initError) {
-          print("Error initializing coins field for user $_userId: $initError");
-          rethrow; // Rethrow the original error or the init error
-       }
+      try {
+        await userDocRef.set({'totalCoins': amount}, SetOptions(merge: true));
+        print("[AttendanceService] Initialized coins field for user $_userId.");
+        // Update SharedPreferences too if initializing
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(_getUserKey(_totalCoinsKey), amount);
+      } catch (initError) {
+        print("Error initializing coins field for user $_userId: $initError");
+        rethrow; // Rethrow the original error or the init error
+      }
     }
 
     // --- Option 2: Update SharedPreferences Only (Simpler but less robust) ---
