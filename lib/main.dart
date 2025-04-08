@@ -24,6 +24,10 @@ import 'models/pet_model.dart';
 import 'screens/pet_tasks_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart'; // Add for date formatting
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
+import 'services/language_service.dart';
 
 // --- Import new screens ---
 import 'screens/profile_screen.dart';
@@ -61,6 +65,11 @@ class PetTask {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Increment app usage count
+  final prefs = await SharedPreferences.getInstance();
+  int usageCount = prefs.getInt('appUsageCount') ?? 0;
+  await prefs.setInt('appUsageCount', usageCount + 1);
+
   // Initialize logging
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
@@ -82,7 +91,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Virtual Pet Companion',
+      title: 'PetPause',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlueAccent),
         useMaterial3: true,
@@ -153,7 +162,7 @@ class MyApp extends StatelessWidget {
           }
 
           if (snapshot.hasData) {
-            return const MyHomePage(title: 'Virtual Pet Companion');
+            return const MyHomePage(title: 'PetPause');
           }
 
           return const AuthWrapper();
@@ -380,15 +389,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-
-    // Register as an observer for lifecycle events
-    WidgetsBinding.instance.addObserver(this);
-
     _userId =
         FirebaseAuth.instance.currentUser?.uid ?? ''; // Ensure userId is set
-
-    // Immediately load happiness coins on startup
-    _refreshCoinsDirectlyFromFirestore();
 
     void showInitialCheckIn() async {
       final attendanceService = AttendanceService();
@@ -1063,12 +1065,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(
-          widget.title,
-          style: GoogleFonts.fredoka(
-            fontSize: screenSize.width * 0.055, // Responsive font size
-            fontWeight: FontWeight.bold,
-          ),
+        title: Row(
+          children: [
+            Image.asset('assets/logoremovebg.png', height: 50, width: 60),
+            const SizedBox(width: 4),
+            Text(
+              widget.title,
+              style: GoogleFonts.lobster(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
         elevation: 8,
         shape: const RoundedRectangleBorder(
@@ -1268,8 +1276,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                           context,
                                           MaterialPageRoute(
                                             builder:
-                                                (context) =>
-                                                    const AttendanceScreen(),
+                                                (context) => AttendanceScreen(),
                                           ),
                                         );
 
@@ -2304,7 +2311,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   // Method to be passed as callback
   void _refreshCoinDisplay() {
-    print("[MyHomePage] Refreshing coin display...");
     _loadHappinessCoins();
   }
 

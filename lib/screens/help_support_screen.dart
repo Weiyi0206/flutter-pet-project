@@ -182,54 +182,58 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     }
   }
 
-  //seach location function
-  // Future<void> _searchLocation(String query) async {
-  //   setState(() {
-  //     _isLoading = true;
-  //   });
+  // Search location function
+  Future<void> _searchLocation(String query) async {
+    setState(() {
+      _isLoading = true;
+    });
 
-  //   try {
-  //     final places = await _placesService.searchByText(query);
+    try {
+      final places = await _placesService.searchByText(query);
 
-  //     if (places.isNotEmpty) {
-  //       final firstPlace = places.first;
+      if (places.isNotEmpty) {
+        final firstPlace = places.first;
 
-  //       if (firstPlace.geometry != null) {
-  //         final location = firstPlace.geometry!.location;
+        if (firstPlace.geometry != null) {
+          final location = firstPlace.geometry!.location;
 
-  //         setState(() {
-  //           currentPosition = Position(
-  //             latitude: location.lat,
-  //             longitude: location.lng,
-  //             timestamp: DateTime.now(),
-  //             accuracy: 0,
-  //             altitude: 0,
-  //             heading: 0,
-  //             speed: 0,
-  //             speedAccuracy: 0,
-  //             altitudeAccuracy: 0,
-  //             headingAccuracy: 0,
-  //           );
-  //         });
+          setState(() {
+            currentPosition = Position(
+              latitude: location.lat,
+              longitude: location.lng,
+              timestamp: DateTime.now(),
+              accuracy: 0,
+              altitude: 0,
+              heading: 0,
+              speed: 0,
+              speedAccuracy: 0,
+              altitudeAccuracy: 0,
+              headingAccuracy: 0,
+            );
+          });
 
-  //         // Move map to new location and find nearby hospitals
-  //         _mapController.animateCamera(
-  //           CameraUpdate.newLatLng(LatLng(location.lat, location.lng)),
-  //         );
+          // Move map to new location and find nearby hospitals
+          _mapController.animateCamera(
+            CameraUpdate.newLatLng(LatLng(location.lat, location.lng)),
+          );
 
-  //         await _findNearbyHospitals();
-  //       }
-  //     }
-  //   } catch (e) {
-  //     setState(() {
-  //       _error = 'Location search failed: ${e.toString()}';
-  //     });
-  //   } finally {
-  //     setState(() {
-  //       _isLoading = false;
-  //     });
-  //   }
-  // }
+          await _findNearbyHospitals();
+        }
+      } else {
+        setState(() {
+          _error = 'No locations found for "$query"';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Location search failed: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   void _showHospitalDetails(Place hospital) {
     showModalBottomSheet(
@@ -1148,6 +1152,34 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
     return Column(
       children: [
+        // Search Bar
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search for a location...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  _searchController.clear();
+                  _getCurrentLocation();
+                },
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+            onSubmitted: (query) {
+              if (query.isNotEmpty) {
+                _searchLocation(query);
+              }
+            },
+          ),
+        ),
         Expanded(
           child: GoogleMap(
             initialCameraPosition: CameraPosition(
