@@ -1,22 +1,22 @@
-# PetPause: Pause, Breathe, and Calm
+# 🐇 PetPause: Pause, Breathe, and Calm
 
 PetPause is a mobile application designed to provide accessible mental health support and promote emotional well-being through interactive features and AI assistance.
 
-## Problem Statement
+## 🔍 Problem Statement
 
 Mental health issues like depression, anxiety, and stress are increasingly prevalent globally. Stigma and limited access to resources prevent many individuals from seeking necessary help. With over 280 million people affected by depression alone, there is a critical need for accessible and supportive mental wellness solutions. PetPause aims to address this gap by offering immediate access to mental health resources, fostering daily engagement through a virtual companion, and bridging the path to professional care.
 
-## SDG Alignment
+## 🌍 SDG Alignment
 
 This project directly aligns with **UN Sustainable Development Goal 3: Good Health and Well-Being**. Specifically, it contributes to:
 *   **Target 3.4:** Promoting mental health and well-being by encouraging proactive self-care.
 *   **Target 3.8:** Improving access to essential health-care services through digital means.
 
-## Solution Overview
+## 💡 Solution Overview
 
 PetPause is a Flutter-based mobile application that serves as a digital companion for mental wellness. It utilizes Firebase for backend services (data storage, authentication) and integrates Google's Gemini AI for interactive chat support.
 
-## Features
+## ✨ Features
 
 *   **Virtual Pet:** A central interactive pet whose appearance changes based on its happiness level, reflecting user engagement.
 *   **Daily Check-In:** Log daily feelings, view entries on a calendar, and earn coins for pet customization.
@@ -27,12 +27,9 @@ PetPause is a Flutter-based mobile application that serves as a digital companio
 *   **Pet Interaction:** Buttons for quick interactions like playing with or talking to the pet.
 *   **Mental Health Tips:** Access self-care practices and healthy habits with step-by-step guidance and links to further resources.
 *   **AI-Powered Chat:** Talk to your pet via a chat bar, powered by Gemini AI. Includes safety alerts for concerning keywords and stores chat history.
-*   **User Profile:** Update display name and profile picture.
-*   **Settings:** View account information, reset password (via email or current password), and delete account.
-*   **Time Management:** Track app usage frequency to promote digital self-awareness.
 *   **App Language:** Options for English, Malay, and Mandarin (Note: Malay and Mandarin translations are planned for future updates).
 
-## Showcase / How It Works
+## ▶️ Showcase / How It Works
 
 1.  **Registration/Login:** User data is securely stored in Firebase.
 2.  **Home Screen:** Users are greeted by their virtual pet, surrounded by interactive features. The pet's appearance reflects its happiness.
@@ -41,7 +38,7 @@ PetPause is a Flutter-based mobile application that serves as a digital companio
 5.  **Personalization:** Earn coins through activities to (eventually) customize the pet.
 6.  **Management:** Access profile, settings, and account management options via the top-right menu.
 
-## Architecture
+## 🛠️ Architecture
 
 *   **Frontend:** Flutter
 *   **Backend:** Firebase (Authentication, Firestore/Realtime Database)
@@ -49,7 +46,7 @@ PetPause is a Flutter-based mobile application that serves as a digital companio
 *   **Mapping:** Google Maps API
 *   **Communication:** Gmail API (for password reset emails)
 
-## Our Goal
+## 🎯 Our Goal
 
 PetPause aims to be more than just an app; it's designed to be a digital companion that heals, supports, and grows with its users. We strive to create a space where individuals feel heard, understood, and motivated to prioritize their mental well-being daily.
 
@@ -60,7 +57,7 @@ This project is built with Flutter. To run the application locally:
 1.  **Ensure Flutter is installed:** Follow the official [Flutter installation guide](https://docs.flutter.dev/get-started/install).
 2.  **Clone the repository:**
     ```bash
-    git clone <your-repository-url>
+    git clone <repository-url>
     cd flutter-project # Or your project directory name
     ```
 3.  **Install dependencies:**
@@ -74,16 +71,18 @@ This project is built with Flutter. To run the application locally:
     *   Enable necessary Firebase services (Authentication, Firestore/Realtime Database).
 5.  **Set up Google Gemini API:**
     *   Obtain an API key from [Google AI Studio](https://aistudio.google.com/app/apikey) or Google Cloud Console.
-    *   Configure the API key securely within your application (e.g., using environment variables or a configuration file not checked into version control).
+    *   Create a new file by copying `lib/config/env.sample.dart` to `lib/config/env.dart`.
+    *   Open `lib/config/env.dart` and replace the placeholder `'YOUR_API_KEY'` with your actual Gemini API key.
+    *   **Important:** The `lib/config/env.dart` file is listed in `.gitignore` to prevent your API key from being accidentally committed to version control.
 6.  **Set up Google Maps API:**
     *   Obtain an API key from the [Google Cloud Console](https://console.cloud.google.com/apis/library/maps-android-backend.googleapis.com).
-    *   Configure the API key in your Android (`AndroidManifest.xml`) and/or iOS (`AppDelegate.swift` or `AppDelegate.m`) configurations.
+    *   Configure the API key in your Android (`android/app/src/main/AndroidManifest.xml`) and/or iOS (`ios/Runner/AppDelegate.swift` or `ios/Runner/AppDelegate.m`) configurations.
 7.  **Run the app:**
     ```bash
     flutter run
     ```
 
-## Future Development
+## 🔭 Future Development
 
 *   **Pet Customization:** Implement the feature to use earned coins for customizing the virtual pet's appearance.
 *   **Full Multilingual Support:** Complete the Malay and Mandarin translations for wider accessibility.
